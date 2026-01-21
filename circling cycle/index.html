@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animated Text Path</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+    #svg-path {
+      position: absolute;
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+  <!-- Hidden SVG used to define and measure the path -->
+  <svg id="svg-path" xmlns="http://www.w3.org/2000/svg">
+    <path id="text-path" d="M 0,-100 C 55,-100 100,-55 100,0 C 100,55 55,100 0,100 C -55,100 -100,55 -100,0 C -100,-55 -55,-100 0,-100" />
+  </svg>
+
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const pathElement = document.getElementById('text-path');
+
+    // Configuration
+    const config = {
+      targetWord: 'love',
+      fontSize: 32,
+      fontFamily: 'monospace',
+      defaultOpacity: 0.5,
+      highlightOpacity: 1.0,
+      pathSpeed: 0.000075,      // Speed of characters moving along path
+      highlightSpeed: 0.0002,   // Speed of highlight (slightly faster)
+      changeInterval: 15000,    // Change shape/word every 15 seconds
+    };
+
+    // Word list (20 words, max 6 characters)
+    const words = [
+      'love', 'star', 'dream', 'hope', 'shine',
+      'peace', 'happy', 'smile', 'dance', 'magic',
+      'light', 'music', 'heart', 'sweet', 'brave',
+      'free', 'wild', 'calm', 'joy', 'glow'
+    ];
+
+    // Example paths - change the 'd' attribute of #text-path to use different shapes
+    const paths = {
+      // Circle (radius 200)
+      circle: 'M 0,-200 C 110,-200 200,-110 200,0 C 200,110 110,200 0,200 C -110,200 -200,110 -200,0 C -200,-110 -110,-200 0,-200',
+      // S-shape
+      sShape: 'M 0,-200 C 160,-200 160,0 0,0 C -160,0 -160,200 0,200',
+      // Figure 8
+      figure8: 'M 0,0 C 100,-100 200,-100 200,0 C 200,100 100,100 0,0 C -100,-100 -200,-100 -200,0 C -200,100 -100,100 0,0',
+      // Heart
+      heart: 'M 0,-130 C 60,-190 160,-130 160,-30 C 160,70 80,130 0,190 C -80,130 -160,70 -160,-30 C -160,-130 -60,-190 0,-130',
+      // Star (5 points)
+      star: 'M 0,-200 L 44,-70 L 190,-70 L 70,20 L 118,150 L 0,70 L -118,150 L -70,20 L -190,-70 L -44,-70 Z',
+    };
+
+    // Get array of path keys for random selection
+    const pathKeys = Object.keys(paths);
+
+    // Set initial path
+    pathElement.setAttribute('d', paths.heart);
+
+    // State
+    let pathOffset = 0;
+    let highlightOffset = 0;
+    let lastTime = 0;
+    let pathLength = 0;
+    let scale = 1;
+
+    // Randomly change shape and word
+    function changeShapeAndWord() {
+      const randomPathKey = pathKeys[Math.floor(Math.random() * pathKeys.length)];
+      const randomWord = words[Math.floor(Math.random() * words.length)];
+
+      pathElement.setAttribute('d', paths[randomPathKey]);
+      config.targetWord = randomWord;
+      pathLength = pathElement.getTotalLength();
+    }
+
+    // Setup canvas and calculate scale
+    function setupCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      // Scale based on the smaller dimension, targeting 80% of viewport
+      const minDimension = Math.min(canvas.width, canvas.height);
+      scale = (minDimension * 0.8) / 400; // 400 is the base path size
+    }
+
+    // Calculate how many characters fit on the path
+    function calculateCharacterCount() {
+      const charWidth = config.fontSize * 0.6; // Approximate monospace char width
+      return Math.floor((pathLength * scale) / charWidth);
+    }
+
+    // Generate the repeated word string to fill the path
+    function generatePathText(length) {
+      const word = config.targetWord.toLowerCase().replace(/[^a-z]/g, '');
+      let text = '';
+      while (text.length < length) {
+        text += word;
+      }
+      return text.substring(0, length);
+    }
+
+    // Get position and angle on SVG path at a given fraction (0 to 1)
+    function getPositionOnPath(t, centerX, centerY) {
+      const distance = t * pathLength;
+      const point = pathElement.getPointAtLength(distance);
+
+      // Get a nearby point to calculate angle
+      const delta = 0.1;
+      const nextPoint = pathElement.getPointAtLength(Math.min(distance + delta, pathLength));
+      const angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x);
+
+      return {
+        x: centerX + point.x * scale,
+        y: centerY + point.y * scale,
+        angle: angle,
+      };
+    }
+
+    // Check if character index is part of the highlighted word
+    function isHighlighted(charIndex, totalChars, highlightPosition) {
+      const wordLength = config.targetWord.length;
+      const highlightStart = Math.floor(highlightPosition * totalChars) % totalChars;
+
+      for (let i = 0; i < wordLength; i++) {
+        const checkIndex = (highlightStart + i) % totalChars;
+        if (checkIndex === charIndex) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Main render function
+    function render(timestamp) {
+      if (!lastTime) lastTime = timestamp;
+      const deltaTime = timestamp - lastTime;
+      lastTime = timestamp;
+
+      // Update offsets
+      pathOffset += config.pathSpeed * deltaTime;
+      highlightOffset += config.highlightSpeed * deltaTime;
+
+      // Keep offsets in range [0, 1]
+      pathOffset = pathOffset % 1;
+      highlightOffset = highlightOffset % 1;
+
+      // Clear canvas
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const charCount = calculateCharacterCount();
+      const pathText = generatePathText(charCount);
+
+      // Set font
+      ctx.font = `${config.fontSize}px ${config.fontFamily}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Draw each character
+      for (let i = 0; i < charCount; i++) {
+        // Calculate position along path (0 to 1) with animation offset
+        const baseT = i / charCount;
+        const animatedT = (baseT + pathOffset) % 1;
+
+        const pos = getPositionOnPath(animatedT, centerX, centerY);
+
+        // Determine if this character is highlighted
+        const highlighted = isHighlighted(i, charCount, highlightOffset);
+        const opacity = highlighted ? config.highlightOpacity : config.defaultOpacity;
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+
+        // Draw character (always upright)
+        ctx.fillText(pathText[i], pos.x, pos.y);
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    // Handle resize
+    window.addEventListener('resize', setupCanvas);
+
+    // Initialize
+    setupCanvas();
+    pathLength = pathElement.getTotalLength();
+    requestAnimationFrame(render);
+
+    // Start random shape/word changes
+    setInterval(changeShapeAndWord, config.changeInterval);
+  </script>
+</body>
+</html>

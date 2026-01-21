@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Letter Display</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: black;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    .display {
+      display: flex;
+      font-size: 4rem;
+    }
+
+    .digit {
+      width: 1ch;
+      text-align: center;
+      transition: opacity 0.1s;
+    }
+
+    .digit.off {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .digit.on {
+      color: rgba(255, 255, 255, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div class="display" id="display"></div>
+
+  <script>
+    const WORD_POOL = [
+      'hello', 'world', 'dream', 'light', 'flame',
+      'stone', 'ocean', 'cloud', 'night', 'music',
+      'storm', 'peace', 'heart', 'smile', 'magic',
+      'dance', 'shine', 'brave', 'ghost', 'river'
+    ];
+    let currentWord = WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)];
+    const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
+    const CYCLE_INTERVAL = 50; // ms between letter changes in off state
+    const STATE_DURATION = 10000; // 10 seconds per state
+    const OFFSET_PER_DIGIT = 3; // alphabet index offset between digits
+    const CHAR_TRANSITION_TIME = 200; // 200ms per character
+
+    let isOn = false;
+    let revealedCount = 0; // how many digits are revealed in on state
+    let digits = [];
+
+    function init() {
+      const display = document.getElementById('display');
+
+      // Create digit elements
+      for (let i = 0; i < currentWord.length; i++) {
+        const digitEl = document.createElement('span');
+        digitEl.className = 'digit off';
+        display.appendChild(digitEl);
+
+        digits.push({
+          element: digitEl,
+          targetLetter: currentWord[i],
+          currentIndex: (i * OFFSET_PER_DIGIT) % 26 // offset each digit
+        });
+      }
+
+      // Start cycling animation
+      setInterval(updateOffState, CYCLE_INTERVAL);
+
+      // Toggle state every 10 seconds
+      setInterval(toggleState, STATE_DURATION);
+
+      // Initial render
+      render();
+    }
+
+    function toggleState() {
+      isOn = !isOn;
+
+      if (isOn) {
+        // Pick a new random word
+        currentWord = WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)];
+        for (let i = 0; i < digits.length; i++) {
+          digits[i].targetLetter = currentWord[i];
+        }
+
+        // Reveal animation: left to right
+        revealedCount = 0;
+
+        for (let i = 0; i < digits.length; i++) {
+          setTimeout(() => {
+            revealedCount = i + 1;
+            render();
+          }, i * CHAR_TRANSITION_TIME);
+        }
+      } else {
+        // Hide animation: right to left
+        for (let i = digits.length - 1; i >= 0; i--) {
+          const delay = (digits.length - 1 - i) * CHAR_TRANSITION_TIME;
+          setTimeout(() => {
+            revealedCount = i;
+            render();
+          }, delay);
+        }
+      }
+    }
+
+    function updateOffState() {
+      if (isOn) return;
+
+      for (let i = 0; i < digits.length; i++) {
+        digits[i].currentIndex = (digits[i].currentIndex + 1) % 26;
+      }
+      render();
+    }
+
+    function render() {
+      for (let i = 0; i < digits.length; i++) {
+        const digit = digits[i];
+
+        if (i < revealedCount) {
+          digit.element.textContent = digit.targetLetter;
+          digit.element.className = 'digit on';
+        } else {
+          digit.element.textContent = ALPHABET[digit.currentIndex];
+          digit.element.className = 'digit off';
+        }
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

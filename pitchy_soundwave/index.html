@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sound Waveform Display</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: black;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .display {
+      display: grid;
+      grid-template-columns: repeat(20, 1fr);
+      grid-template-rows: repeat(20, 1fr);
+      gap: 6px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: white;
+      opacity: 0.3;
+      transition: opacity 0.05s ease;
+    }
+
+    .dot.on {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="display" id="display"></div>
+
+  <script>
+    const GRID_SIZE = 20;
+    const display = document.getElementById('display');
+    const dots = [];
+
+    // Create the 20x20 grid of dots
+    for (let y = 0; y < GRID_SIZE; y++) {
+      dots[y] = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        display.appendChild(dot);
+        dots[y][x] = dot;
+      }
+    }
+
+    // Turn all dots off
+    function clearDisplay() {
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          dots[y][x].classList.remove('on');
+        }
+      }
+    }
+
+    // Draw waveform based on audio data
+    function drawWaveform(dataArray) {
+      clearDisplay();
+
+      const step = Math.floor(dataArray.length / GRID_SIZE);
+      const sensitivity = 3; // Amplify the signal
+      let prevY = null;
+
+      for (let x = 0; x < GRID_SIZE; x++) {
+        // Get sample value (0-255), center is 128
+        const sample = dataArray[x * step];
+
+        // Amplify the deviation from center
+        const deviation = (sample - 128) * sensitivity;
+        const amplified = 128 + deviation;
+
+        // Clamp to 0-255 range
+        const clamped = Math.max(0, Math.min(255, amplified));
+
+        // Convert to grid position (inverted so higher values are at top)
+        const y = Math.floor((1 - clamped / 255) * (GRID_SIZE - 1));
+
+        // Light up the dot at this position
+        dots[y][x].classList.add('on');
+
+        // Connect to previous dot by filling in the gap
+        if (prevY !== null && prevY !== y) {
+          const startY = Math.min(prevY, y);
+          const endY = Math.max(prevY, y);
+          for (let fillY = startY; fillY <= endY; fillY++) {
+            dots[fillY][x].classList.add('on');
+          }
+        }
+
+        prevY = y;
+      }
+    }
+
+    // Initialize audio
+    async function initAudio() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+
+        analyser.fftSize = 1024;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        function update() {
+          analyser.getByteTimeDomainData(dataArray);
+          drawWaveform(dataArray);
+        }
+
+        // Update every 100ms
+        setInterval(update, 50);
+      } catch (err) {
+        console.error('Error accessing microphone:', err);
+        alert('Could not access microphone. Please allow microphone access and reload the page.');
+      }
+    }
+
+    // Initialize audio on load
+    initAudio();
+  </script>
+</body>
+</html>
