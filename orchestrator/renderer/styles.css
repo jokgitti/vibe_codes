@@ -1,0 +1,115 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #0a0a0a;
+  color: #ffffff;
+  font-family: 'Courier New', Courier, monospace;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.container {
+  padding: 20px;
+  width: 100%;
+}
+
+h1 {
+  text-align: center;
+  font-size: 1.5rem;
+  margin-bottom: 30px;
+  letter-spacing: 4px;
+  color: #888;
+}
+
+.stats {
+  margin-bottom: 20px;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 10px;
+}
+
+.label {
+  width: 70px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.bar-container {
+  flex: 1;
+  height: 20px;
+  background-color: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  background-color: #444;
+  width: 0%;
+  transition: width 0.1s ease-out;
+}
+
+.audio-bar {
+  background-color: #555;
+  transition: width 0.05s ease-out;
+}
+
+.count {
+  width: 50px;
+  text-align: right;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.status {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #444;
+  margin-bottom: 25px;
+  min-height: 20px;
+}
+
+.status.listening {
+  color: #4a4;
+}
+
+.status.action {
+  color: #888;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+button {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  color: #666;
+  padding: 10px 20px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+button:hover {
+  background-color: #222;
+  border-color: #444;
+  color: #888;
+}
+
+button:active {
+  background-color: #333;
+}

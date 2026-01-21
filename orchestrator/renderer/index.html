@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Orchestrator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>ORCHESTRATOR</h1>
+
+    <div class="stats">
+      <div class="stat-row">
+        <span class="label">Windows:</span>
+        <div class="bar-container">
+          <div class="bar" id="windowBar"></div>
+        </div>
+        <span class="count" id="windowCount">0/20</span>
+      </div>
+
+      <div class="stat-row">
+        <span class="label">Audio:</span>
+        <div class="bar-container">
+          <div class="bar audio-bar" id="audioBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="status" id="status">Initializing...</div>
+
+    <div class="controls">
+      <button id="openBtn">Open Window</button>
+      <button id="closeBtn">Close Window</button>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
