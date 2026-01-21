@@ -32,11 +32,11 @@
     }
 
     .digit.off {
-      color: rgba(255, 255, 255, 0.6);
+      color: rgba(255, 255, 255, 0.4);
     }
 
     .digit.on {
-      color: rgba(255, 255, 255, 0.8);
+      color: rgba(255, 255, 255, 1.0);
     }
   </style>
 </head>
@@ -53,13 +53,81 @@
     let currentWord = WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)];
     const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
     const CYCLE_INTERVAL = 50; // ms between letter changes in off state
-    const STATE_DURATION = 10000; // 10 seconds per state
+    const OFF_STATE_DURATION = 7000; // 7 seconds in off state
+    const ON_STATE_DURATION = 20000; // 20 seconds in on state
     const OFFSET_PER_DIGIT = 3; // alphabet index offset between digits
     const CHAR_TRANSITION_TIME = 200; // 200ms per character
 
+    // Audio-reactive opacity settings
+    const MIN_ON_OPACITY = 0.6;
+    const MAX_ON_OPACITY = 1.0;
+    const VOLUME_SCALE = 24; // volume value that maps to max opacity (lower = more sensitive)
+    const OPACITY_UPDATE_INTERVAL = 100; // ms between opacity updates
+
     let isOn = false;
+    let lastOpacityUpdate = 0;
     let revealedCount = 0; // how many digits are revealed in on state
     let digits = [];
+
+    // Audio state
+    let audioContext = null;
+    let analyser = null;
+    let timeDomainData = null;
+    let currentVolume = 0;
+
+    // Initialize audio
+    async function initAudio() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        timeDomainData = new Uint8Array(analyser.fftSize);
+
+        // Start audio analysis loop
+        analyzeAudio();
+      } catch (err) {
+        console.log('Microphone access denied - using static opacity');
+      }
+    }
+
+    // Calculate volume from time-domain data
+    function getVolume() {
+      if (!analyser) return 0;
+
+      analyser.getByteTimeDomainData(timeDomainData);
+      let sum = 0;
+      for (let i = 0; i < timeDomainData.length; i++) {
+        const deviation = Math.abs(timeDomainData[i] - 128);
+        sum += deviation;
+      }
+      return sum / timeDomainData.length;
+    }
+
+    // Audio analysis loop
+    function analyzeAudio(timestamp) {
+      currentVolume = getVolume();
+
+      // Update opacity if in ON state (throttled)
+      if (isOn && revealedCount > 0) {
+        if (timestamp - lastOpacityUpdate >= OPACITY_UPDATE_INTERVAL) {
+          lastOpacityUpdate = timestamp;
+          render();
+        }
+      }
+
+      requestAnimationFrame(analyzeAudio);
+    }
+
+    // Calculate dynamic opacity based on volume
+    function getOnOpacity() {
+      const normalized = Math.min(currentVolume / VOLUME_SCALE, 1);
+      return MIN_ON_OPACITY + normalized * (MAX_ON_OPACITY - MIN_ON_OPACITY);
+    }
 
     function init() {
       const display = document.getElementById('display');
@@ -77,14 +145,24 @@
         });
       }
 
+      // Initialize audio for reactive opacity
+      initAudio();
+
       // Start cycling animation
       setInterval(updateOffState, CYCLE_INTERVAL);
 
-      // Toggle state every 10 seconds
-      setInterval(toggleState, STATE_DURATION);
+      // Schedule first state toggle (starts in off state)
+      setTimeout(scheduleToggle, OFF_STATE_DURATION);
 
       // Initial render
       render();
+    }
+
+    function scheduleToggle() {
+      toggleState();
+      // Schedule next toggle based on new state
+      const nextDuration = isOn ? ON_STATE_DURATION : OFF_STATE_DURATION;
+      setTimeout(scheduleToggle, nextDuration);
     }
 
     function toggleState() {
@@ -128,15 +206,19 @@
     }
 
     function render() {
+      const onOpacity = getOnOpacity();
+
       for (let i = 0; i < digits.length; i++) {
         const digit = digits[i];
 
         if (i < revealedCount) {
           digit.element.textContent = digit.targetLetter;
           digit.element.className = 'digit on';
+          digit.element.style.color = `rgba(255, 255, 255, ${onOpacity})`;
         } else {
           digit.element.textContent = ALPHABET[digit.currentIndex];
           digit.element.className = 'digit off';
+          digit.element.style.color = ''; // Reset to CSS default
         }
       }
     }
