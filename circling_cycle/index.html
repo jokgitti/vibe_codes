@@ -47,9 +47,21 @@
       defaultOpacity: 0.5,
       highlightOpacity: 1.0,
       pathSpeed: 0.000075,      // Speed of characters moving along path
-      highlightSpeed: 0.0002,   // Speed of highlight (slightly faster)
-      changeInterval: 15000,    // Change shape/word every 15 seconds
     };
+
+    // Audio-reactive speed settings
+    const MIN_HIGHLIGHT_SPEED = config.pathSpeed * 1.2;  // 20% faster than path in silence
+    const MAX_HIGHLIGHT_SPEED = 0.0004;                   // ~5x pathSpeed when loud
+    const VOLUME_SCALE = 24;                              // Sensitivity (lower = more sensitive)
+    const SPEED_UPDATE_INTERVAL = 100;                    // ms between speed updates
+
+    // Audio state
+    let audioContext = null;
+    let analyser = null;
+    let timeDomainData = null;
+    let currentVolume = 0;
+    let currentHighlightSpeed = MIN_HIGHLIGHT_SPEED;
+    let lastSpeedUpdate = 0;
 
     // Word list (20 words, max 6 characters)
     const words = [
@@ -86,14 +98,50 @@
     let pathLength = 0;
     let scale = 1;
 
-    // Randomly change shape and word
-    function changeShapeAndWord() {
+    // Randomly select shape and word (called once at startup)
+    function selectShapeAndWord() {
       const randomPathKey = pathKeys[Math.floor(Math.random() * pathKeys.length)];
       const randomWord = words[Math.floor(Math.random() * words.length)];
 
       pathElement.setAttribute('d', paths[randomPathKey]);
       config.targetWord = randomWord;
       pathLength = pathElement.getTotalLength();
+    }
+
+    // Initialize audio for reactive highlight speed
+    async function initAudio() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        timeDomainData = new Uint8Array(analyser.fftSize);
+      } catch (err) {
+        console.log('Microphone access denied - using static speed');
+      }
+    }
+
+    // Calculate volume from time-domain data
+    function getVolume() {
+      if (!analyser) return 0;
+
+      analyser.getByteTimeDomainData(timeDomainData);
+      let sum = 0;
+      for (let i = 0; i < timeDomainData.length; i++) {
+        const deviation = Math.abs(timeDomainData[i] - 128);
+        sum += deviation;
+      }
+      return sum / timeDomainData.length;
+    }
+
+    // Calculate dynamic highlight speed based on volume
+    function getHighlightSpeed() {
+      const normalized = Math.min(currentVolume / VOLUME_SCALE, 1);
+      return MIN_HIGHLIGHT_SPEED + normalized * (MAX_HIGHLIGHT_SPEED - MIN_HIGHLIGHT_SPEED);
     }
 
     // Setup canvas and calculate scale
@@ -158,9 +206,16 @@
       const deltaTime = timestamp - lastTime;
       lastTime = timestamp;
 
+      // Update audio volume and highlight speed (throttled)
+      currentVolume = getVolume();
+      if (timestamp - lastSpeedUpdate >= SPEED_UPDATE_INTERVAL) {
+        lastSpeedUpdate = timestamp;
+        currentHighlightSpeed = getHighlightSpeed();
+      }
+
       // Update offsets
       pathOffset += config.pathSpeed * deltaTime;
-      highlightOffset += config.highlightSpeed * deltaTime;
+      highlightOffset += currentHighlightSpeed * deltaTime;
 
       // Keep offsets in range [0, 1]
       pathOffset = pathOffset % 1;
@@ -206,11 +261,9 @@
 
     // Initialize
     setupCanvas();
-    pathLength = pathElement.getTotalLength();
+    selectShapeAndWord();  // Pick random shape and word once at startup
+    initAudio();           // Initialize microphone for audio-reactive speed
     requestAnimationFrame(render);
-
-    // Start random shape/word changes
-    setInterval(changeShapeAndWord, config.changeInterval);
   </script>
 </body>
 </html>

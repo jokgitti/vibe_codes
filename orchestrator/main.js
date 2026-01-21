@@ -3,7 +3,7 @@ const path = require('path');
 
 // Available projects (relative to orchestrator folder)
 const PROJECTS = [
-  'circling cycle',
+  'circling_cycle',
   'lucid_dream',
   'pitchy_soundwave',
   'rotating_gliph'

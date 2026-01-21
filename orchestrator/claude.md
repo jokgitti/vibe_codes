@@ -86,7 +86,7 @@ npm start
 ## Available Projects
 
 The orchestrator randomly selects from:
-- `circling cycle` - Text animation along SVG paths
+- `circling_cycle` - Text animation along SVG paths (audio-reactive highlight speed)
 - `lucid_dream` - Slot-machine style letter display
 - `pitchy_soundwave` - Microphone waveform visualizer
 - `rotating_gliph` - Audio-reactive 3D dodecahedron
