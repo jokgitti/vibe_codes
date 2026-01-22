@@ -1,10 +1,6 @@
-const { contextBridge, ipcRenderer } = require('electron');
+// Preload script - minimal for v2 (virtual windows managed in renderer)
+const { contextBridge } = require('electron');
 
-contextBridge.exposeInMainWorld('orchestrator', {
-  openWindow: () => ipcRenderer.send('open-window'),
-  closeWindow: () => ipcRenderer.send('close-window'),
-  getWindowCount: () => ipcRenderer.invoke('get-window-count'),
-  onWindowCount: (callback) => {
-    ipcRenderer.on('window-count', (event, count) => callback(count));
-  }
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Future IPC can be added here if needed
 });

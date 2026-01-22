@@ -110,6 +110,18 @@
     let mediaStream = null;
     let audioContext = null;
 
+    // External audio (from orchestrator via postMessage)
+    let externalAudio = null;
+
+    // Listen for external audio data from orchestrator
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'audio' && e.data.timeDomainData) {
+        externalAudio = e.data;
+        // Draw waveform from external data
+        drawWaveform(new Uint8Array(e.data.timeDomainData));
+      }
+    });
+
     // Initialize audio
     async function initAudio() {
       try {

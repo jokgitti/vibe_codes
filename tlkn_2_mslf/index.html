@@ -195,6 +195,23 @@
     let mediaStream = null
     let frequencyData = null
 
+    // External audio (from orchestrator via postMessage)
+    let externalAudio = null
+
+    // Listen for external audio data from orchestrator
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'audio') {
+        externalAudio = e.data
+        // Initialize frequencyData if needed
+        if (e.data.frequencyData && !frequencyData) {
+          frequencyData = new Uint8Array(e.data.frequencyData.length)
+        }
+        if (e.data.frequencyData) {
+          frequencyData.set(e.data.frequencyData)
+        }
+      }
+    })
+
     // Beat detection state
     const volumeHistory = []
     let lastBeatTime = 0
@@ -231,6 +248,12 @@
 
     // Volume calculation (frequency domain with kick boost)
     function getVolume() {
+      // Use external audio data if available (orchestrator mode)
+      if (externalAudio && externalAudio.volume !== undefined) {
+        return externalAudio.volume
+      }
+
+      // Fallback to local audio (standalone mode)
       if (!analyser) return 0
 
       analyser.getByteFrequencyData(frequencyData)

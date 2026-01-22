@@ -48,6 +48,24 @@ let frequencyData = null;
 let audioEnabled = false;
 let mediaStream = null;  // Keep reference to stop on close
 
+// External audio (from orchestrator via postMessage)
+let externalAudio = null;
+
+// Listen for external audio data from orchestrator
+window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'audio') {
+        externalAudio = e.data;
+        audioEnabled = true; // Enable audio processing
+        // Convert frequency array back to Uint8Array if needed
+        if (e.data.frequencyData && !frequencyData) {
+            frequencyData = new Uint8Array(e.data.frequencyData.length);
+        }
+        if (e.data.frequencyData) {
+            frequencyData.set(e.data.frequencyData);
+        }
+    }
+});
+
 // Beat detection state
 const volumeHistory = [];
 const VOLUME_HISTORY_SIZE = 30; // ~0.5 seconds at 60fps
@@ -121,6 +139,13 @@ function startFallbackRotation() {
 
 // Calculate weighted volume (boosted sub-bass for EDM)
 function getVolume() {
+    // Use external audio data if available (orchestrator mode)
+    if (externalAudio && externalAudio.volume !== undefined) {
+        return externalAudio.volume;
+    }
+
+    // Fallback to local audio (standalone mode)
+    if (!analyser) return 0;
     analyser.getByteFrequencyData(frequencyData);
     let sum = 0;
     const kickEnd = Math.floor(KICK_HIGH / BIN_WIDTH);

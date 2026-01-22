@@ -64,6 +64,16 @@
     let lastSpeedUpdate = 0;
     let mediaStream = null;  // Keep reference to stop on close
 
+    // External audio (from orchestrator via postMessage)
+    let externalAudio = null;
+
+    // Listen for external audio data from orchestrator
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'audio') {
+        externalAudio = e.data;
+      }
+    });
+
     // Word list (20 words, max 6 characters)
     const words = [
       'love', 'star', 'dream', 'hope', 'shine',
@@ -139,6 +149,12 @@
 
     // Calculate volume from time-domain data
     function getVolume() {
+      // Use external audio data if available (orchestrator mode)
+      if (externalAudio && externalAudio.volume !== undefined) {
+        return externalAudio.volume;
+      }
+
+      // Fallback to local audio (standalone mode)
       if (!analyser) return 0;
 
       analyser.getByteTimeDomainData(timeDomainData);
