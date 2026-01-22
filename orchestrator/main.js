@@ -1,6 +1,9 @@
 const { app, BrowserWindow, session } = require('electron');
 const path = require('path');
 
+// Increase memory limit to 4GB
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+
 let mainWindow = null;
 
 function createMainWindow() {

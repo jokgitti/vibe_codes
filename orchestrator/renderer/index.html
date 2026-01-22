@@ -8,13 +8,13 @@
 </head>
 <body>
   <div class="app">
-    <!-- Control Panel Sidebar -->
-    <aside class="control-panel">
-      <h1>ORCHESTRATOR</h1>
+    <!-- Control Panel Sidebar (hidden by default, Cmd+I to toggle) -->
+    <aside class="control-panel hidden">
+      <h1>orchestrator</h1>
 
       <div class="stats">
         <div class="stat-row">
-          <span class="label">Windows</span>
+          <span class="label">windows</span>
           <div class="bar-container">
             <div class="bar" id="windowBar"></div>
           </div>
@@ -22,26 +22,26 @@
         </div>
 
         <div class="stat-row">
-          <span class="label">Audio</span>
+          <span class="label">audio</span>
           <div class="bar-container">
             <div class="bar audio-bar" id="audioBar"></div>
           </div>
         </div>
 
         <div class="stat-row slider-row">
-          <span class="label">Sensitivity</span>
+          <span class="label">sensitivity</span>
           <input type="range" id="sensitivitySlider" min="0.5" max="2" step="0.1" value="1">
           <span class="count" id="sensitivityValue">1.0x</span>
         </div>
 
         <div class="stat-row">
-          <span class="label">Pattern</span>
+          <span class="label">pattern</span>
           <select id="patternSelect">
-            <option value="grid">Grid Fill</option>
-            <option value="spiral">Spiral</option>
-            <option value="random">Random</option>
-            <option value="cascade">Cascade</option>
-            <option value="burst">Center Burst</option>
+            <option value="random">random</option>
+            <option value="grid">grid fill</option>
+            <option value="spiral">spiral</option>
+            <option value="cascade">cascade</option>
+            <option value="burst">center burst</option>
           </select>
         </div>
       </div>
@@ -49,15 +49,35 @@
       <div class="status" id="status">Initializing...</div>
 
       <div class="controls">
-        <button id="openBtn">Open</button>
-        <button id="closeBtn">Close</button>
+        <button id="openBtn">open</button>
+        <button id="closeBtn">close</button>
       </div>
     </aside>
 
     <!-- Virtual Window Container -->
     <main class="window-container" id="windowContainer">
       <!-- Virtual windows (iframes with Win98 chrome) will be added here -->
+
+      <!-- Title overlay (shown when auto-open is off) -->
+      <div class="title-overlay" id="titleOverlay">
+        <h1>orchestrator</h1>
+        <p>press cmd + s to vibe</p>
+      </div>
     </main>
+
+    <!-- Project Selection Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal">
+        <div class="modal-title">open project</div>
+        <div class="modal-content">
+          <select id="projectSelect"></select>
+        </div>
+        <div class="modal-buttons">
+          <button id="modalOpenBtn">open</button>
+          <button id="modalCancelBtn">cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="renderer.js"></script>

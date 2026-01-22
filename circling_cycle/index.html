@@ -49,30 +49,38 @@
       pathSpeed: 0.000075,      // Speed of characters moving along path
     };
 
-    // Audio-reactive speed settings
+    // Audio-reactive speed settings (time-domain volume typically 0-30)
     const MIN_HIGHLIGHT_SPEED = config.pathSpeed * 1.2;  // 20% faster than path in silence
     const MAX_HIGHLIGHT_SPEED = 0.0004;                   // ~5x pathSpeed when loud
-    const VOLUME_SCALE = 24;                              // Sensitivity (lower = more sensitive)
+    const VOLUME_SCALE = 15;                              // Sensitivity (lower = more sensitive)
     const SPEED_UPDATE_INTERVAL = 100;                    // ms between speed updates
 
-    // Audio state
-    let audioContext = null;
-    let analyser = null;
-    let timeDomainData = null;
-    let currentVolume = 0;
-    let currentHighlightSpeed = MIN_HIGHLIGHT_SPEED;
-    let lastSpeedUpdate = 0;
-    let mediaStream = null;  // Keep reference to stop on close
+    // Audio settings (standardized)
+    const FFT_SIZE = 512;
 
-    // External audio (from orchestrator via postMessage)
+    // ==========================================================================
+    // EXTERNAL AUDIO (from orchestrator)
+    // ==========================================================================
+
     let externalAudio = null;
 
-    // Listen for external audio data from orchestrator
     window.addEventListener('message', (e) => {
       if (e.data && e.data.type === 'audio') {
         externalAudio = e.data;
+        document.body.style.backgroundColor = 'black';
       }
     });
+
+    // ==========================================================================
+    // LOCAL AUDIO (standalone mode)
+    // ==========================================================================
+
+    let audioContext = null;
+    let analyser = null;
+    let timeDomainData = null;
+    let currentHighlightSpeed = MIN_HIGHLIGHT_SPEED;
+    let lastSpeedUpdate = 0;
+    let mediaStream = null;
 
     // Word list (20 words, max 6 characters)
     const words = [
@@ -125,15 +133,16 @@
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
+        analyser.fftSize = FFT_SIZE;
+        analyser.smoothingTimeConstant = 0.3;
 
         const source = audioContext.createMediaStreamSource(mediaStream);
         source.connect(analyser);
 
         timeDomainData = new Uint8Array(analyser.fftSize);
       } catch (err) {
-        console.log('Microphone access denied - using static speed');
-        document.body.style.backgroundColor = 'red';
+        console.log('Microphone access denied - will use external audio if available');
+        // Don't set red background - external audio may come in
       }
     }
 
@@ -147,28 +156,25 @@
       }
     });
 
-    // Calculate volume from time-domain data
-    function getVolume() {
-      // Use external audio data if available (orchestrator mode)
-      if (externalAudio && externalAudio.volume !== undefined) {
-        return externalAudio.volume;
-      }
-
-      // Fallback to local audio (standalone mode)
+    // Get local volume (standalone mode)
+    function getLocalVolume() {
       if (!analyser) return 0;
-
       analyser.getByteTimeDomainData(timeDomainData);
       let sum = 0;
       for (let i = 0; i < timeDomainData.length; i++) {
-        const deviation = Math.abs(timeDomainData[i] - 128);
-        sum += deviation;
+        sum += Math.abs(timeDomainData[i] - 128);
       }
       return sum / timeDomainData.length;
     }
 
-    // Calculate dynamic highlight speed based on volume
+    // Calculate dynamic highlight speed based on normalized volume
     function getHighlightSpeed() {
-      const normalized = Math.min(currentVolume / VOLUME_SCALE, 1);
+      // Use pre-computed normalizedVolume from orchestrator
+      if (externalAudio && externalAudio.normalizedVolume !== undefined) {
+        return MIN_HIGHLIGHT_SPEED + externalAudio.normalizedVolume * (MAX_HIGHLIGHT_SPEED - MIN_HIGHLIGHT_SPEED);
+      }
+      // Fallback to local volume calculation
+      const normalized = Math.min(getLocalVolume() / VOLUME_SCALE, 1);
       return MIN_HIGHLIGHT_SPEED + normalized * (MAX_HIGHLIGHT_SPEED - MIN_HIGHLIGHT_SPEED);
     }
 
@@ -234,8 +240,7 @@
       const deltaTime = timestamp - lastTime;
       lastTime = timestamp;
 
-      // Update audio volume and highlight speed (throttled)
-      currentVolume = getVolume();
+      // Update highlight speed (throttled)
       if (timestamp - lastSpeedUpdate >= SPEED_UPDATE_INTERVAL) {
         lastSpeedUpdate = timestamp;
         currentHighlightSpeed = getHighlightSpeed();

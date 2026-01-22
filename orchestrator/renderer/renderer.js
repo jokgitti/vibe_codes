@@ -11,8 +11,8 @@ const CONFIG = {
   CHROME_PADDING: 8, // borders + margins
 
   // Limits
-  MAX_WINDOWS: 50,
-  MAX_PER_PROJECT: 15,
+  MAX_WINDOWS: 35,
+  MAX_PER_PROJECT: 7,
 
   // Audio
   FFT_SIZE: 512,
@@ -20,21 +20,20 @@ const CONFIG = {
   VOLUME_HISTORY_SIZE: 30,
 
   // Beat detection (base values, adjusted by sensitivity)
-  BEAT_THRESHOLD_BASE: 1.25,
+  // Time-domain volume typically ranges 0-30
+  BEAT_THRESHOLD_BASE: 1.3,
   BEAT_COOLDOWN: 300,
-  MIN_VOLUME_BASE: 5,
+  MIN_VOLUME_BASE: 2,
 
   // Close detection
   CLOSE_COOLDOWN: 800,
   MIN_WINDOWS_TO_CLOSE: 3,
 
-  // Audio broadcast
-  BROADCAST_RATE: 60
+  // Audio broadcast (30fps = 33ms interval)
+  BROADCAST_INTERVAL: 33
 };
 
-// Frequency analysis
-const BIN_WIDTH = CONFIG.SAMPLE_RATE / CONFIG.FFT_SIZE;
-const KICK_HIGH = 150;
+// Time-domain analysis (standardized across all projects)
 
 // Available projects
 const PROJECTS = [
@@ -58,6 +57,7 @@ let audioEnabled = false;
 const volumeHistory = [];
 let lastBeatTime = 0;
 let lastCloseTime = 0;
+let lastBroadcastTime = 0;
 
 // Sensitivity
 let sensitivity = 1.0;
@@ -69,7 +69,10 @@ const projectCounts = {};
 PROJECTS.forEach(p => projectCounts[p] = 0);
 
 // Pattern
-let currentPattern = 'grid';
+let currentPattern = 'random';
+
+// Auto-open mode (toggled with Cmd+S)
+let autoOpenEnabled = false;
 
 // Grid state (for grid pattern)
 let gridCells = [];
@@ -80,6 +83,7 @@ let gridRows = 0;
 // DOM ELEMENTS
 // =============================================================================
 
+const controlPanel = document.querySelector('.control-panel');
 const windowContainer = document.getElementById('windowContainer');
 const windowBar = document.getElementById('windowBar');
 const windowCountEl = document.getElementById('windowCount');
@@ -90,6 +94,11 @@ const closeBtn = document.getElementById('closeBtn');
 const sensitivitySlider = document.getElementById('sensitivitySlider');
 const sensitivityValue = document.getElementById('sensitivityValue');
 const patternSelect = document.getElementById('patternSelect');
+const modalOverlay = document.getElementById('modalOverlay');
+const projectSelect = document.getElementById('projectSelect');
+const modalOpenBtn = document.getElementById('modalOpenBtn');
+const modalCancelBtn = document.getElementById('modalCancelBtn');
+const titleOverlay = document.getElementById('titleOverlay');
 
 // =============================================================================
 // SENSITIVITY
@@ -131,29 +140,22 @@ async function initAudio() {
     frequencyData = new Uint8Array(analyser.frequencyBinCount);
     timeDomainData = new Uint8Array(analyser.fftSize);
     audioEnabled = true;
-
-    setStatus('Listening...');
   } catch (err) {
     console.error('Microphone access denied:', err);
-    setStatus('Microphone access denied');
+    setStatus('microphone access denied');
   }
 }
 
 function getVolume() {
   if (!analyser) return 0;
 
-  analyser.getByteFrequencyData(frequencyData);
+  // Time-domain analysis: average deviation from center (128)
+  analyser.getByteTimeDomainData(timeDomainData);
   let sum = 0;
-  const kickEnd = Math.floor(KICK_HIGH / BIN_WIDTH);
-
-  for (let i = 0; i < frequencyData.length; i++) {
-    if (i < kickEnd) {
-      sum += frequencyData[i] * 2;
-    } else {
-      sum += frequencyData[i];
-    }
+  for (let i = 0; i < timeDomainData.length; i++) {
+    sum += Math.abs(timeDomainData[i] - 128);
   }
-  return sum / frequencyData.length;
+  return sum / timeDomainData.length;
 }
 
 function getAverageVolume() {
@@ -458,11 +460,16 @@ function broadcastAudioData(volume, beat) {
     analyser.getByteTimeDomainData(timeDomainData);
   }
 
+  const avgVolume = getAverageVolume();
+  // Normalize volume to 0-1 range (time-domain typically 0-30)
+  const normalizedVolume = Math.min(volume / 15, 1);
+
   const data = {
     type: 'audio',
     volume,
+    normalizedVolume,
+    avgVolume,
     beat,
-    frequencyData: frequencyData ? Array.from(frequencyData) : [],
     timeDomainData: timeDomainData ? Array.from(timeDomainData) : [],
     timestamp: performance.now()
   };
@@ -524,28 +531,33 @@ function analyzeLoop(currentTime) {
     lastBeatTime = currentTime;
     beat = true;
 
-    if (virtualWindows.length < CONFIG.MAX_WINDOWS) {
+    // Only auto-open windows when enabled
+    if (autoOpenEnabled && virtualWindows.length < CONFIG.MAX_WINDOWS) {
       createVirtualWindow();
-      setStatus('Beat - Opening window...');
-      setTimeout(() => setStatus('Listening...'), 500);
+      setStatus('beat - opening window...');
+      setTimeout(() => setStatus(autoOpenEnabled ? 'auto-open on' : 'auto-open off'), 500);
     }
   }
 
-  // Close on quiet
+  // Close on quiet (only when auto-open is enabled)
   const timeSinceClose = currentTime - lastCloseTime;
-  if (volume < avgVolume * 0.4 &&
+  if (autoOpenEnabled &&
+      volume < avgVolume * 0.4 &&
       avgVolume > getMinVolume() &&
       timeSinceClose > CONFIG.CLOSE_COOLDOWN &&
       virtualWindows.length >= CONFIG.MIN_WINDOWS_TO_CLOSE) {
 
     lastCloseTime = currentTime;
     closeOldestWindow();
-    setStatus('Quiet - Closing window...');
-    setTimeout(() => setStatus('Listening...'), 500);
+    setStatus('quiet - closing window...');
+    setTimeout(() => setStatus(autoOpenEnabled ? 'auto-open on' : 'auto-open off'), 500);
   }
 
-  // Broadcast audio to iframes
-  broadcastAudioData(volume, beat);
+  // Broadcast audio to iframes (throttled to 30fps)
+  if (currentTime - lastBroadcastTime >= CONFIG.BROADCAST_INTERVAL) {
+    lastBroadcastTime = currentTime;
+    broadcastAudioData(volume, beat);
+  }
 
   // Update UI
   updateUI();
@@ -572,12 +584,197 @@ window.addEventListener('resize', () => {
 });
 
 // =============================================================================
+// PROJECT SELECTION MODAL
+// =============================================================================
+
+let modalVisible = false;
+
+// Initialize project dropdown
+function initProjectSelect() {
+  projectSelect.innerHTML = '';
+  PROJECTS.forEach(project => {
+    const option = document.createElement('option');
+    option.value = project;
+    option.textContent = project;
+    projectSelect.appendChild(option);
+  });
+}
+
+function showProjectModal() {
+  initProjectSelect();
+  modalOverlay.classList.add('visible');
+  projectSelect.focus();
+  modalVisible = true;
+}
+
+function hideProjectModal() {
+  modalOverlay.classList.remove('visible');
+  modalVisible = false;
+}
+
+function confirmProjectSelection() {
+  const project = projectSelect.value;
+  hideProjectModal();
+  createVirtualWindowWithProject(project);
+}
+
+// Modal button handlers
+modalOpenBtn.addEventListener('click', confirmProjectSelection);
+modalCancelBtn.addEventListener('click', hideProjectModal);
+
+// Create window with specific project
+function createVirtualWindowWithProject(project) {
+  if (virtualWindows.length >= CONFIG.MAX_WINDOWS) {
+    setStatus('max windows reached');
+    return null;
+  }
+
+  if (projectCounts[project] >= CONFIG.MAX_PER_PROJECT) {
+    setStatus(`max ${project} windows reached`);
+    return null;
+  }
+
+  const { x, y, gridIndex } = getNextPosition();
+  const id = windowIdCounter++;
+
+  const windowEl = document.createElement('div');
+  windowEl.className = 'win98-window spawning';
+  windowEl.style.left = `${x}px`;
+  windowEl.style.top = `${y}px`;
+  windowEl.style.width = `${CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING}px`;
+  windowEl.style.height = `${CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING}px`;
+
+  const titleBar = document.createElement('div');
+  titleBar.className = 'win98-titlebar';
+
+  const title = document.createElement('span');
+  title.className = 'win98-title';
+  title.textContent = project;
+
+  const buttons = document.createElement('div');
+  buttons.className = 'win98-buttons';
+
+  const closeButton = document.createElement('button');
+  closeButton.className = 'win98-btn win98-btn-close';
+  closeButton.textContent = '×';
+  closeButton.onclick = () => closeVirtualWindow(id);
+
+  buttons.appendChild(closeButton);
+  titleBar.appendChild(title);
+  titleBar.appendChild(buttons);
+
+  const content = document.createElement('div');
+  content.className = 'win98-content';
+
+  const iframe = document.createElement('iframe');
+  iframe.src = `../../${project}/index.html`;
+  iframe.allow = 'microphone';
+
+  content.appendChild(iframe);
+  windowEl.appendChild(titleBar);
+  windowEl.appendChild(content);
+  windowContainer.appendChild(windowEl);
+
+  const win = { id, element: windowEl, iframe, project, gridIndex };
+  virtualWindows.push(win);
+  projectCounts[project]++;
+
+  if (gridIndex >= 0 && gridIndex < gridCells.length) {
+    gridCells[gridIndex] = id;
+  }
+
+  setTimeout(() => windowEl.classList.remove('spawning'), 300);
+
+  updateUI();
+  return win;
+}
+
+// =============================================================================
+// KEYBOARD SHORTCUTS
+// =============================================================================
+
+window.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+
+  // Handle modal keyboard input
+  if (modalVisible) {
+    // Escape: Close modal
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      hideProjectModal();
+      return;
+    }
+
+    // Enter: Confirm selection
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmProjectSelection();
+      return;
+    }
+    return;
+  }
+
+  // Cmd+N (or Ctrl+N): Open project selection modal
+  if ((e.metaKey || e.ctrlKey) && key === 'n') {
+    e.preventDefault();
+    showProjectModal();
+    return;
+  }
+
+  // Cmd+I (or Ctrl+I): Toggle control panel
+  if ((e.metaKey || e.ctrlKey) && key === 'i') {
+    e.preventDefault();
+    controlPanel.classList.toggle('hidden');
+    return;
+  }
+
+  // Cmd+Shift+S (or Ctrl+Shift+S): Close all windows
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && key === 's') {
+    e.preventDefault();
+    closeAllWindows();
+    setStatus('closed all windows');
+    return;
+  }
+
+  // Cmd+S (or Ctrl+S): Toggle auto-open mode
+  if ((e.metaKey || e.ctrlKey) && key === 's' && !e.shiftKey) {
+    e.preventDefault();
+    autoOpenEnabled = !autoOpenEnabled;
+    titleOverlay.classList.toggle('hidden', autoOpenEnabled);
+    setStatus(autoOpenEnabled ? 'auto-open on' : 'auto-open off');
+  }
+});
+
+// Click outside modal to close
+modalOverlay.addEventListener('click', (e) => {
+  if (e.target === modalOverlay) {
+    hideProjectModal();
+  }
+});
+
+// Close all windows
+function closeAllWindows() {
+  // Close from newest to oldest to avoid index issues
+  while (virtualWindows.length > 0) {
+    const win = virtualWindows[virtualWindows.length - 1];
+    win.element.remove();
+    if (win.gridIndex >= 0 && win.gridIndex < gridCells.length) {
+      gridCells[win.gridIndex] = null;
+    }
+    projectCounts[win.project]--;
+    virtualWindows.pop();
+  }
+  updateUI();
+}
+
+// =============================================================================
 // INIT
 // =============================================================================
 
 async function init() {
   recalculateGrid();
   await initAudio();
+  setStatus('auto-open off (cmd+s to start)');
   requestAnimationFrame(analyzeLoop);
 }
 

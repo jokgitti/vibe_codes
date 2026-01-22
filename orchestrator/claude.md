@@ -1,5 +1,11 @@
 # Orchestrator v2
 
+## UI Guidelines
+
+- **Always use lowercase** for all UI labels, buttons, status messages, and text
+
+---
+
 An audio-reactive window orchestrator that displays browser windows (iframes) showing other vibe_codes projects based on microphone input.
 
 ## Overview

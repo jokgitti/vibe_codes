@@ -58,16 +58,13 @@
     const OFFSET_PER_DIGIT = 3; // alphabet index offset between digits
     const CHAR_TRANSITION_TIME = 200; // 200ms per character
 
-    // Audio settings (aligned with rotating_gliph and tlkn_2_mslf)
+    // Audio settings (standardized across all projects)
     const FFT_SIZE = 512;
-    const SAMPLE_RATE = 44100;
-    const BIN_WIDTH = SAMPLE_RATE / FFT_SIZE;
-    const KICK_HIGH = 150; // Kick drum range upper bound
 
-    // Audio-reactive opacity settings
+    // Audio-reactive opacity settings (time-domain volume typically 0-30)
     const MIN_ON_OPACITY = 0.6;
     const MAX_ON_OPACITY = 1.0;
-    const VOLUME_SCALE = 24; // volume value that maps to max opacity (lower = more sensitive)
+    const VOLUME_SCALE = 15; // volume value that maps to max opacity (lower = more sensitive)
     const OPACITY_UPDATE_INTERVAL = 100; // ms between opacity updates
 
     let isOn = false;
@@ -77,28 +74,28 @@
     let audioPulsingEnabled = false; // only pulse after all letters revealed + delay
     const PULSE_START_DELAY = 500; // ms to wait after full reveal before pulsing
 
-    // Audio state
-    let audioContext = null;
-    let analyser = null;
-    let frequencyData = null;
-    let currentVolume = 0;
-    let mediaStream = null;  // Keep reference to stop on close
+    // ==========================================================================
+    // EXTERNAL AUDIO (from orchestrator)
+    // ==========================================================================
 
-    // External audio (from orchestrator via postMessage)
     let externalAudio = null;
 
-    // Listen for external audio data from orchestrator
     window.addEventListener('message', (e) => {
       if (e.data && e.data.type === 'audio') {
         externalAudio = e.data;
-        // Update volume from external data
-        if (e.data.volume !== undefined) {
-          currentVolume = e.data.volume;
-        }
+        document.body.style.backgroundColor = 'black';
       }
     });
 
-    // Initialize audio
+    // ==========================================================================
+    // LOCAL AUDIO (standalone mode)
+    // ==========================================================================
+
+    let audioContext = null;
+    let analyser = null;
+    let timeDomainData = null;
+    let mediaStream = null;
+
     async function initAudio() {
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -109,56 +106,35 @@
 
         const source = audioContext.createMediaStreamSource(mediaStream);
         source.connect(analyser);
-
-        frequencyData = new Uint8Array(analyser.frequencyBinCount);
-
-        // Start audio analysis loop
-        analyzeAudio();
+        timeDomainData = new Uint8Array(analyser.fftSize);
       } catch (err) {
-        console.log('Microphone access denied - using static opacity');
-        document.body.style.backgroundColor = 'red';
+        console.log('Microphone access denied - will use external audio if available');
       }
+
+      // Always start render loop
+      requestAnimationFrame(renderLoop);
     }
 
-    // Clean up audio stream on window close
     window.addEventListener('beforeunload', () => {
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
-      }
-      if (audioContext) {
-        audioContext.close();
-      }
+      if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+      if (audioContext) audioContext.close();
     });
 
-    // Calculate volume from frequency data with kick boost
-    function getVolume() {
-      // Use external audio data if available (orchestrator mode)
-      if (externalAudio && externalAudio.volume !== undefined) {
-        return externalAudio.volume;
-      }
-
-      // Fallback to local audio (standalone mode)
+    function getLocalVolume() {
       if (!analyser) return 0;
-
-      analyser.getByteFrequencyData(frequencyData);
+      analyser.getByteTimeDomainData(timeDomainData);
       let sum = 0;
-      const kickEnd = Math.floor(KICK_HIGH / BIN_WIDTH);
-
-      for (let i = 0; i < frequencyData.length; i++) {
-        // Boost kick frequencies by 2x
-        if (i < kickEnd) {
-          sum += frequencyData[i] * 2;
-        } else {
-          sum += frequencyData[i];
-        }
+      for (let i = 0; i < timeDomainData.length; i++) {
+        sum += Math.abs(timeDomainData[i] - 128);
       }
-      return sum / frequencyData.length;
+      return sum / timeDomainData.length;
     }
 
-    // Audio analysis loop
-    function analyzeAudio(timestamp) {
-      currentVolume = getVolume();
+    // ==========================================================================
+    // RENDER LOOP (throttled opacity updates)
+    // ==========================================================================
 
+    function renderLoop(timestamp) {
       // Update opacity only when pulsing is enabled (throttled)
       if (isOn && audioPulsingEnabled) {
         if (timestamp - lastOpacityUpdate >= OPACITY_UPDATE_INTERVAL) {
@@ -166,13 +142,17 @@
           render();
         }
       }
-
-      requestAnimationFrame(analyzeAudio);
+      requestAnimationFrame(renderLoop);
     }
 
-    // Calculate dynamic opacity based on volume
+    // Calculate dynamic opacity based on normalized volume
     function getOnOpacity() {
-      const normalized = Math.min(currentVolume / VOLUME_SCALE, 1);
+      // Use pre-computed normalizedVolume from orchestrator
+      if (externalAudio && externalAudio.normalizedVolume !== undefined) {
+        return MIN_ON_OPACITY + externalAudio.normalizedVolume * (MAX_ON_OPACITY - MIN_ON_OPACITY);
+      }
+      // Fallback to local volume calculation
+      const normalized = Math.min(getLocalVolume() / VOLUME_SCALE, 1);
       return MIN_ON_OPACITY + normalized * (MAX_ON_OPACITY - MIN_ON_OPACITY);
     }
 
