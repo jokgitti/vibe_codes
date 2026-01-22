@@ -6,16 +6,16 @@ const CONFIG = {
 
   // Window open thresholds (volume spike)
   OPEN_THRESHOLD: 1.2,       // Volume spike to open (20% above average)
-  OPEN_COOLDOWN: 500,        // ms between opens
+  OPEN_COOLDOWN: 1000,       // ms between opens (gives time for stream cleanup)
   MIN_BASS_LEVEL: 2,         // Minimum average volume to trigger (silence is ~0-1)
   NOISE_GATE: 5,             // Absolute minimum volume (time-domain, silence ~0-1)
 
   // Window close thresholds
-  CLOSE_COOLDOWN: 800,       // ms between closes
+  CLOSE_COOLDOWN: 1600,      // ms between closes (gives time for stream cleanup)
   MIN_WINDOWS_TO_CLOSE: 5,   // Minimum windows before closing allowed
 
   // Limits
-  MAX_WINDOWS: 20
+  MAX_WINDOWS: 16  // OS audio stream limit
 };
 
 // Audio state
@@ -61,8 +61,8 @@ async function initAudio() {
     setStatus('Listening...', 'listening');
     console.log('Audio initialized');
 
-    // Start analysis loop
-    requestAnimationFrame(analyzeLoop);
+    // Start analysis loop (use setInterval to avoid rAF throttling when window loses focus)
+    setInterval(analyzeLoop, 16);  // ~60fps
   } catch (err) {
     console.error('Microphone access denied:', err);
     setStatus('Microphone access denied', '');
@@ -109,9 +109,10 @@ function setStatus(text, className) {
 }
 
 // Main analysis loop
-function analyzeLoop(currentTime) {
+function analyzeLoop() {
   if (!audioEnabled) return;
 
+  const currentTime = performance.now();
   const volume = getVolume();
   const avgVolume = getAverageVolume();
 
@@ -165,8 +166,6 @@ function analyzeLoop(currentTime) {
       if (audioEnabled) setStatus('Listening...', 'listening');
     }, 500);
   }
-
-  requestAnimationFrame(analyzeLoop);
 }
 
 // Handle window count updates from main process

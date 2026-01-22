@@ -53,8 +53,8 @@
     let currentWord = WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)];
     const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
     const CYCLE_INTERVAL = 50; // ms between letter changes in off state
-    const OFF_STATE_DURATION = 7000; // 7 seconds in off state
-    const ON_STATE_DURATION = 20000; // 20 seconds in on state
+    const OFF_STATE_DURATION = 3500; // 3.5 seconds in off state
+    const ON_STATE_DURATION = 7000; // 7 seconds in on state
     const OFFSET_PER_DIGIT = 3; // alphabet index offset between digits
     const CHAR_TRANSITION_TIME = 200; // 200ms per character
 
@@ -68,22 +68,25 @@
     let lastOpacityUpdate = 0;
     let revealedCount = 0; // how many digits are revealed in on state
     let digits = [];
+    let audioPulsingEnabled = false; // only pulse after all letters revealed + delay
+    const PULSE_START_DELAY = 500; // ms to wait after full reveal before pulsing
 
     // Audio state
     let audioContext = null;
     let analyser = null;
     let timeDomainData = null;
     let currentVolume = 0;
+    let mediaStream = null;  // Keep reference to stop on close
 
     // Initialize audio
     async function initAudio() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
 
-        const source = audioContext.createMediaStreamSource(stream);
+        const source = audioContext.createMediaStreamSource(mediaStream);
         source.connect(analyser);
 
         timeDomainData = new Uint8Array(analyser.fftSize);
@@ -92,8 +95,19 @@
         analyzeAudio();
       } catch (err) {
         console.log('Microphone access denied - using static opacity');
+        document.body.style.backgroundColor = 'red';
       }
     }
+
+    // Clean up audio stream on window close
+    window.addEventListener('beforeunload', () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+    });
 
     // Calculate volume from time-domain data
     function getVolume() {
@@ -112,8 +126,8 @@
     function analyzeAudio(timestamp) {
       currentVolume = getVolume();
 
-      // Update opacity if in ON state (throttled)
-      if (isOn && revealedCount > 0) {
+      // Update opacity only when pulsing is enabled (throttled)
+      if (isOn && audioPulsingEnabled) {
         if (timestamp - lastOpacityUpdate >= OPACITY_UPDATE_INTERVAL) {
           lastOpacityUpdate = timestamp;
           render();
@@ -177,14 +191,23 @@
 
         // Reveal animation: left to right
         revealedCount = 0;
+        audioPulsingEnabled = false;
 
         for (let i = 0; i < digits.length; i++) {
           setTimeout(() => {
             revealedCount = i + 1;
             render();
+            // After last letter is revealed, wait then enable pulsing
+            if (revealedCount === digits.length) {
+              setTimeout(() => {
+                audioPulsingEnabled = true;
+              }, PULSE_START_DELAY);
+            }
           }, i * CHAR_TRANSITION_TIME);
         }
       } else {
+        // Disable pulsing immediately when hiding
+        audioPulsingEnabled = false;
         // Hide animation: right to left
         for (let i = digits.length - 1; i >= 0; i--) {
           const delay = (digits.length - 1 - i) * CHAR_TRANSITION_TIME;
@@ -206,7 +229,8 @@
     }
 
     function render() {
-      const onOpacity = getOnOpacity();
+      // Use audio-reactive opacity only when pulsing is enabled, otherwise minimum brightness
+      const onOpacity = audioPulsingEnabled ? getOnOpacity() : MIN_ON_OPACITY;
 
       for (let i = 0; i < digits.length; i++) {
         const digit = digits[i];

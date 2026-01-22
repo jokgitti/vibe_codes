@@ -62,6 +62,7 @@
     let currentVolume = 0;
     let currentHighlightSpeed = MIN_HIGHLIGHT_SPEED;
     let lastSpeedUpdate = 0;
+    let mediaStream = null;  // Keep reference to stop on close
 
     // Word list (20 words, max 6 characters)
     const words = [
@@ -111,19 +112,30 @@
     // Initialize audio for reactive highlight speed
     async function initAudio() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
 
-        const source = audioContext.createMediaStreamSource(stream);
+        const source = audioContext.createMediaStreamSource(mediaStream);
         source.connect(analyser);
 
         timeDomainData = new Uint8Array(analyser.fftSize);
       } catch (err) {
         console.log('Microphone access denied - using static speed');
+        document.body.style.backgroundColor = 'red';
       }
     }
+
+    // Clean up audio stream on window close
+    window.addEventListener('beforeunload', () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+    });
 
     // Calculate volume from time-domain data
     function getVolume() {

@@ -46,6 +46,7 @@ let audioContext = null;
 let analyser = null;
 let frequencyData = null;
 let audioEnabled = false;
+let mediaStream = null;  // Keep reference to stop on close
 
 // Beat detection state
 const volumeHistory = [];
@@ -76,14 +77,14 @@ const DIRECTION_CHANGE_THRESHOLD = 1.10; // Energy must change by 10% to flip di
 // Initialize audio
 async function initAudio() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
         analyser.fftSize = FFT_SIZE;
         analyser.smoothingTimeConstant = 0.3; // Less smoothing = more reactive
 
-        const source = audioContext.createMediaStreamSource(stream);
+        const source = audioContext.createMediaStreamSource(mediaStream);
         source.connect(analyser);
 
         frequencyData = new Uint8Array(analyser.frequencyBinCount);
@@ -92,9 +93,21 @@ async function initAudio() {
         console.log('EDM mode enabled! Kick → X axis, Snare → Y axis, Hi-hats → Z axis');
     } catch (err) {
         console.log('Microphone access denied - falling back to timed rotation');
+        document.body.style.backgroundColor = 'red';
+        scene.background = new THREE.Color(0xff0000);
         startFallbackRotation();
     }
 }
+
+// Clean up audio stream on window close
+window.addEventListener('beforeunload', () => {
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+    }
+    if (audioContext) {
+        audioContext.close();
+    }
+});
 
 // Fallback to original timed rotation
 function startFallbackRotation() {

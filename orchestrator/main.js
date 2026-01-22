@@ -11,7 +11,7 @@ const PROJECTS = [
 
 // Window configuration
 const WINDOW_SIZE = 400;
-const MAX_WINDOWS = 20;
+const MAX_WINDOWS = 16;  // System limit for simultaneous audio streams
 const MAX_PER_PROJECT = 7;
 
 // Track open project windows: { window, project }

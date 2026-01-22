@@ -15,19 +15,21 @@ A slot-machine-style text animation that cycles through random letters before re
 
 The display alternates between two states:
 
-**OFF State (7 seconds):**
+**OFF State (3.5 seconds):**
 - All letters cycle through the alphabet continuously
 - Each digit has an offset (3 positions apart) creating a wave effect
 - Letters appear dimmed (40% opacity)
 
-**ON State (20 seconds):**
+**ON State (7 seconds):**
 - Letters are revealed left-to-right with 200ms delay between each
-- Revealed letters have dynamic opacity based on audio (60% - 100%)
+- During reveal, letters appear at 60% opacity (static)
+- After all letters revealed, waits 500ms then audio-reactive pulsing begins
+- Pulsing stops immediately when hide animation starts
 - A new random word is selected when entering ON state
 
 ### Audio-Reactive Opacity
 
-When in ON state, the opacity of revealed letters responds to microphone input:
+After all letters are revealed and a 500ms delay, opacity responds to microphone input:
 
 ```javascript
 // Volume mapped to opacity range
@@ -56,11 +58,13 @@ The offset between digits (`OFFSET_PER_DIGIT = 3`) creates visual interest - let
 ### Reveal/Hide Animation
 
 **Reveal (entering ON state):**
-- Characters revealed left-to-right
+- Characters revealed left-to-right at 60% opacity
 - 200ms (`CHAR_TRANSITION_TIME`) between each reveal
 - `revealedCount` increments: 0 → 1 → 2 → 3 → 4 → 5
+- After last letter: 500ms delay, then audio pulsing enabled
 
 **Hide (entering OFF state):**
+- Audio pulsing disabled immediately
 - Characters hidden right-to-left
 - Same timing, but `revealedCount` decrements: 5 → 4 → 3 → 2 → 1 → 0
 
@@ -69,11 +73,12 @@ The offset between digits (`OFFSET_PER_DIGIT = 3`) creates visual interest - let
 | Parameter | Default | Effect |
 |-----------|---------|--------|
 | `CYCLE_INTERVAL` | 50ms | Speed of letter cycling in off state |
-| `OFF_STATE_DURATION` | 7000ms | Time spent in off state |
-| `ON_STATE_DURATION` | 20000ms | Time spent in on state |
+| `OFF_STATE_DURATION` | 3500ms | Time spent in off state |
+| `ON_STATE_DURATION` | 7000ms | Time spent in on state |
 | `OFFSET_PER_DIGIT` | 3 | Alphabet offset between adjacent digits |
 | `CHAR_TRANSITION_TIME` | 200ms | Delay between each character reveal/hide |
-| `MIN_ON_OPACITY` | 0.6 | Minimum opacity when ON (quiet) |
+| `PULSE_START_DELAY` | 500ms | Delay after full reveal before pulsing starts |
+| `MIN_ON_OPACITY` | 0.6 | Minimum opacity when ON (quiet/static) |
 | `MAX_ON_OPACITY` | 1.0 | Maximum opacity when ON (loud) |
 | `VOLUME_SCALE` | 24 | Volume value that maps to max opacity |
 | `OPACITY_UPDATE_INTERVAL` | 100ms | Throttle for opacity updates |

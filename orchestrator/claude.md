@@ -58,7 +58,7 @@ Parameters in `renderer/renderer.js`:
 | `MIN_BASS_LEVEL` | 2 | Minimum average volume |
 | `CLOSE_COOLDOWN` | 800ms | Time between closes |
 | `MIN_WINDOWS_TO_CLOSE` | 5 | Minimum windows before closing |
-| `MAX_WINDOWS` | 20 | Maximum windows |
+| `MAX_WINDOWS` | 16 | Maximum windows (OS audio stream limit) |
 | `MAX_PER_PROJECT` | 7 | Maximum windows per project |
 
 ## Project Structure
