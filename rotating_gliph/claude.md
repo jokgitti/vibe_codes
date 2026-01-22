@@ -20,8 +20,9 @@ if (currentVolume > averageVolume * BEAT_THRESHOLD)
 ```
 
 **Parameters:**
-- `BEAT_THRESHOLD = 1.05` - Current volume must be 5% above average to trigger
-- `BEAT_COOLDOWN = 200ms` - Minimum time between triggers
+- `BEAT_THRESHOLD = 1.25` - Current volume must be 25% above average to trigger
+- `BEAT_COOLDOWN = 300ms` - Minimum time between triggers
+- `MIN_VOLUME = 5` - Minimum average volume to avoid silence triggering
 - `VOLUME_HISTORY_SIZE = 30` - Rolling window for average (~0.5 seconds at 60fps)
 
 Volume is calculated from FFT frequency data, with sub-bass frequencies weighted 2x to better detect EDM kicks.
@@ -58,8 +59,9 @@ All parameters are at the top of `main.js`:
 
 | Parameter | Default | Effect |
 |-----------|---------|--------|
-| `BEAT_THRESHOLD` | 1.05 | Lower = more sensitive to beats |
-| `BEAT_COOLDOWN` | 200ms | Lower = can trigger more frequently |
+| `BEAT_THRESHOLD` | 1.25 | Lower = more sensitive to beats |
+| `BEAT_COOLDOWN` | 300ms | Lower = can trigger more frequently |
+| `MIN_VOLUME` | 5 | Lower = triggers on quieter sounds |
 | `DIRECTION_CHANGE_THRESHOLD` | 1.10 | Lower = direction changes more easily |
 | `ROTATION_AMOUNT` | 25° | Degrees per rotation |
 | `animationDuration` | 500ms | How long each rotation animation takes |

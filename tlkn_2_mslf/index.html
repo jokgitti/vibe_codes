@@ -115,14 +115,24 @@
   <script>
     // Configuration
     const CONFIG = {
-      MIN_INTERVAL: 800,
-      MAX_INTERVAL: 3000,
-      VOLUME_SCALE: 24,
+      // Beat detection
+      BEAT_THRESHOLD: 1.25,      // Volume must be 25% above average to trigger
+      BEAT_COOLDOWN: 300,        // ms between messages
+      VOLUME_HISTORY_SIZE: 30,   // ~0.5 seconds at 60fps
+      MIN_VOLUME: 5,             // Minimum average volume (avoid silence triggering)
+
+      // Display
       FRESH_MESSAGE_COUNT: 2,
-      FADE_OVER_MESSAGES: 12, // Number of messages to fade from 100% to 20%
-      FFT_SIZE: 2048,
-      AUDIO_UPDATE_MS: 100
+      FADE_OVER_MESSAGES: 12,
+
+      // Audio
+      FFT_SIZE: 512,
+      SAMPLE_RATE: 44100
     }
+
+    // Frequency bands (same as rotating_gliph)
+    const BIN_WIDTH = CONFIG.SAMPLE_RATE / CONFIG.FFT_SIZE
+    const KICK_HIGH = 150 // Kick drum range upper bound
 
     // Participant A sentences (right, blue)
     const SENTENCES_A = [
@@ -172,21 +182,22 @@
       "But we'd still be here."
     ]
 
-    // State
+    // Message state
     const messages = [] // { id, participant, text, element }
     let messageId = 0
     let currentTurn = 0 // 0 = A, 1 = B
     let sentenceIndexA = 0
     let sentenceIndexB = 0
-    let currentInterval = CONFIG.MAX_INTERVAL
-    let messageTimer = null
 
     // Audio state
     let audioContext = null
     let analyser = null
     let mediaStream = null
-    let timeDomainData = null
-    let lastAudioUpdate = 0
+    let frequencyData = null
+
+    // Beat detection state
+    const volumeHistory = []
+    let lastBeatTime = 0
 
     // DOM
     const chatContainer = document.getElementById('chat')
@@ -198,11 +209,12 @@
         audioContext = new (window.AudioContext || window.webkitAudioContext)()
         analyser = audioContext.createAnalyser()
         analyser.fftSize = CONFIG.FFT_SIZE
+        analyser.smoothingTimeConstant = 0.3
 
         const source = audioContext.createMediaStreamSource(mediaStream)
         source.connect(analyser)
 
-        timeDomainData = new Uint8Array(analyser.fftSize)
+        frequencyData = new Uint8Array(analyser.frequencyBinCount)
         return true
       } catch (err) {
         console.log('Microphone access denied:', err)
@@ -217,27 +229,31 @@
       if (audioContext) audioContext.close()
     })
 
-    // Volume calculation (time-domain RMS)
+    // Volume calculation (frequency domain with kick boost)
     function getVolume() {
       if (!analyser) return 0
 
-      analyser.getByteTimeDomainData(timeDomainData)
+      analyser.getByteFrequencyData(frequencyData)
       let sum = 0
+      const kickEnd = Math.floor(KICK_HIGH / BIN_WIDTH)
 
-      for (let i = 0; i < timeDomainData.length; i++) {
-        const deviation = Math.abs(timeDomainData[i] - 128)
-        sum += deviation
+      for (let i = 0; i < frequencyData.length; i++) {
+        // Boost kick frequencies by 2x
+        if (i < kickEnd) {
+          sum += frequencyData[i] * 2
+        } else {
+          sum += frequencyData[i]
+        }
       }
 
-      return sum / timeDomainData.length
+      return sum / frequencyData.length
     }
 
-    // Map volume to message interval
-    function updateInterval() {
-      const volume = getVolume()
-      const normalized = Math.min(volume / CONFIG.VOLUME_SCALE, 1)
-      // Inverse: louder = faster (shorter interval)
-      currentInterval = CONFIG.MAX_INTERVAL - (normalized * (CONFIG.MAX_INTERVAL - CONFIG.MIN_INTERVAL))
+    // Get average volume from history
+    function getAverageVolume() {
+      if (volumeHistory.length === 0) return 0
+      const sum = volumeHistory.reduce((a, b) => a + b, 0)
+      return sum / volumeHistory.length
     }
 
     // Create message DOM element
@@ -327,24 +343,35 @@
 
       // Clean up messages that scrolled off screen
       cleanupOffscreenMessages()
-
-      scheduleNextMessage()
     }
 
-    // Schedule next message with current interval
-    function scheduleNextMessage() {
-      if (messageTimer) {
-        clearTimeout(messageTimer)
+    // Analyze audio and detect beats
+    function analyzeAudio(currentTime) {
+      if (!analyser) return
+
+      const volume = getVolume()
+      const avgVolume = getAverageVolume()
+
+      // Update volume history
+      volumeHistory.push(volume)
+      if (volumeHistory.length > CONFIG.VOLUME_HISTORY_SIZE) {
+        volumeHistory.shift()
       }
-      messageTimer = setTimeout(addMessage, currentInterval)
+
+      // Beat detection
+      const timeSinceLastBeat = currentTime - lastBeatTime
+      if (volume > avgVolume * CONFIG.BEAT_THRESHOLD &&
+          timeSinceLastBeat > CONFIG.BEAT_COOLDOWN &&
+          avgVolume > CONFIG.MIN_VOLUME) {
+
+        lastBeatTime = currentTime
+        addMessage()
+      }
     }
 
-    // Animation loop for audio updates
+    // Animation loop
     function animate(timestamp) {
-      if (timestamp - lastAudioUpdate >= CONFIG.AUDIO_UPDATE_MS) {
-        lastAudioUpdate = timestamp
-        updateInterval()
-      }
+      analyzeAudio(timestamp)
       requestAnimationFrame(animate)
     }
 

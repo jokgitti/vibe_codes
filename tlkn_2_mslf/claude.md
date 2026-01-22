@@ -35,13 +35,14 @@ Messages fade from 100% opacity (newest) to 20% opacity (oldest) over a configur
 - **Expansion**: Height animates to smoothly push older messages up
 - **Opacity**: Smooth transitions when opacity changes
 
-### Audio Reactivity
+### Audio Reactivity (Beat Detection)
 
-Microphone input controls the speed at which messages appear:
-- **Loud** → Fast messages (800ms interval)
-- **Quiet** → Slow messages (3000ms interval)
+Messages are triggered by audio beats, similar to `rotating_gliph`:
+- Compares current volume to rolling average
+- When volume spikes above threshold, a new message appears
+- Cooldown prevents rapid-fire messages
 
-Volume is calculated using time-domain RMS analysis (same approach as other vibe_codes projects).
+This creates a reactive conversation that responds to sound - claps, music beats, or voice will trigger new messages.
 
 ## Configuration
 
@@ -49,13 +50,15 @@ Parameters in `index.html`:
 
 | Parameter | Default | Effect |
 |-----------|---------|--------|
-| `MIN_INTERVAL` | 800ms | Fastest message speed (loud) |
-| `MAX_INTERVAL` | 3000ms | Slowest message speed (quiet) |
-| `VOLUME_SCALE` | 24 | Audio normalization factor |
+| `BEAT_THRESHOLD` | 1.08 | Volume spike multiplier (8% above average) |
+| `BEAT_COOLDOWN` | 300ms | Minimum time between messages |
+| `VOLUME_HISTORY_SIZE` | 30 | Rolling window for average (~0.5s) |
+| `MIN_VOLUME` | 2 | Minimum average to avoid silence triggering |
 | `FRESH_MESSAGE_COUNT` | 2 | Messages shown in plain text |
 | `FADE_OVER_MESSAGES` | 12 | Messages to fade from 100% to 20% opacity |
-| `FFT_SIZE` | 2048 | Audio buffer size |
-| `AUDIO_UPDATE_MS` | 100ms | Audio analysis throttle |
+| `FFT_SIZE` | 512 | Audio buffer size (smaller = more responsive) |
+
+Volume is calculated from frequency data with kick frequencies (< 150Hz) boosted 2x for better beat detection.
 
 ## Styling
 

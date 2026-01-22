@@ -51,8 +51,9 @@ let mediaStream = null;  // Keep reference to stop on close
 // Beat detection state
 const volumeHistory = [];
 const VOLUME_HISTORY_SIZE = 30; // ~0.5 seconds at 60fps
-const BEAT_THRESHOLD = 1.05; // Current volume must be 1.05x average to trigger
-const BEAT_COOLDOWN = 200; // ms between beats
+const BEAT_THRESHOLD = 1.25; // Current volume must be 1.25x average to trigger
+const BEAT_COOLDOWN = 300; // ms between beats
+const MIN_VOLUME = 5; // Minimum average volume to avoid silence triggering
 let lastBeatTime = 0;
 
 // EDM-optimized: Larger FFT for better bass resolution
@@ -225,7 +226,7 @@ function analyzeAudio(currentTime) {
     const timeSinceLastBeat = currentTime - lastBeatTime;
     if (volume > avgVolume * BEAT_THRESHOLD &&
         timeSinceLastBeat > BEAT_COOLDOWN &&
-        avgVolume > 2) { // Minimum threshold to avoid silence triggering
+        avgVolume > MIN_VOLUME) {
 
         lastBeatTime = currentTime;
         const { axis, direction } = getRotationParams();
