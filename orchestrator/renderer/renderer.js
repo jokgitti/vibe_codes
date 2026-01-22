@@ -1,14 +1,14 @@
-// Audio analysis configuration
+// Audio analysis configuration (base values)
 const CONFIG = {
   // Audio setup
   FFT_SIZE: 2048,            // Larger for better time-domain resolution
   VOLUME_HISTORY_SIZE: 30,   // ~0.5 seconds at 60fps
 
-  // Window open thresholds (volume spike)
-  OPEN_THRESHOLD: 1.2,       // Volume spike to open (20% above average)
+  // Window open thresholds (volume spike) - base values
+  OPEN_THRESHOLD_BASE: 1.2,  // Volume spike to open (20% above average)
   OPEN_COOLDOWN: 1000,       // ms between opens (gives time for stream cleanup)
-  MIN_BASS_LEVEL: 2,         // Minimum average volume to trigger (silence is ~0-1)
-  NOISE_GATE: 5,             // Absolute minimum volume (time-domain, silence ~0-1)
+  MIN_BASS_LEVEL_BASE: 2,    // Minimum average volume to trigger (silence is ~0-1)
+  NOISE_GATE_BASE: 5,        // Absolute minimum volume (time-domain, silence ~0-1)
 
   // Window close thresholds
   CLOSE_COOLDOWN: 1600,      // ms between closes (gives time for stream cleanup)
@@ -17,6 +17,25 @@ const CONFIG = {
   // Limits
   MAX_WINDOWS: 16  // OS audio stream limit
 };
+
+// Sensitivity multiplier (adjusted via slider)
+let sensitivity = 1.0;
+
+// Get effective thresholds based on sensitivity
+function getOpenThreshold() {
+  // Higher sensitivity = lower threshold (triggers easier)
+  // At sensitivity 2.0: threshold = 1.0 + (0.2 / 2) = 1.1
+  // At sensitivity 0.5: threshold = 1.0 + (0.2 * 2) = 1.4
+  return 1.0 + (CONFIG.OPEN_THRESHOLD_BASE - 1.0) / sensitivity;
+}
+
+function getNoiseGate() {
+  return CONFIG.NOISE_GATE_BASE / sensitivity;
+}
+
+function getMinBassLevel() {
+  return CONFIG.MIN_BASS_LEVEL_BASE / sensitivity;
+}
 
 // Audio state
 let audioContext = null;
@@ -41,6 +60,14 @@ const audioBar = document.getElementById('audioBar');
 const statusEl = document.getElementById('status');
 const openBtn = document.getElementById('openBtn');
 const closeBtn = document.getElementById('closeBtn');
+const sensitivitySlider = document.getElementById('sensitivitySlider');
+const sensitivityValue = document.getElementById('sensitivityValue');
+
+// Sensitivity slider handler
+sensitivitySlider.addEventListener('input', (e) => {
+  sensitivity = parseFloat(e.target.value);
+  sensitivityValue.textContent = sensitivity.toFixed(1) + 'x';
+});
 
 // Initialize audio
 async function initAudio() {
@@ -130,10 +157,10 @@ function analyzeLoop() {
   const timeSinceClose = currentTime - lastCloseTime;
 
   // OPEN condition: volume spike above threshold AND above noise gate
-  if (volume > avgVolume * CONFIG.OPEN_THRESHOLD &&
-      volume > CONFIG.NOISE_GATE &&
+  if (volume > avgVolume * getOpenThreshold() &&
+      volume > getNoiseGate() &&
       timeSinceOpen > CONFIG.OPEN_COOLDOWN &&
-      avgVolume > CONFIG.MIN_BASS_LEVEL) {
+      avgVolume > getMinBassLevel()) {
 
     lastOpenTime = currentTime;
 
@@ -154,7 +181,7 @@ function analyzeLoop() {
 
   // CLOSE condition: volume drops significantly below average
   if (volume < avgVolume * 0.5 &&
-      avgVolume > CONFIG.MIN_BASS_LEVEL &&
+      avgVolume > getMinBassLevel() &&
       timeSinceClose > CONFIG.CLOSE_COOLDOWN &&
       windowCount >= CONFIG.MIN_WINDOWS_TO_CLOSE) {
 
