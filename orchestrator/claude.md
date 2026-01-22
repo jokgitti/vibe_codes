@@ -90,6 +90,7 @@ The orchestrator randomly selects from:
 - `lucid_dream` - Slot-machine style letter display
 - `pitchy_soundwave` - Microphone waveform visualizer
 - `rotating_gliph` - Audio-reactive 3D dodecahedron
+- `tlkn_2_mslf` - Auto-playing base64 chat (audio-reactive message speed)
 
 ## Controls
 

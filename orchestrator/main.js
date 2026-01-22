@@ -6,7 +6,8 @@ const PROJECTS = [
   'circling_cycle',
   'lucid_dream',
   'pitchy_soundwave',
-  'rotating_gliph'
+  'rotating_gliph',
+  'tlkn_2_mslf'
 ];
 
 // Window configuration
