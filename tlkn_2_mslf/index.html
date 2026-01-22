@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tlkn_2_mslf</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: black;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Courier New', monospace;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 820px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column-reverse;
+      overflow: hidden;
+      padding: 20px;
+      gap: 8px;
+      align-content: flex-end;
+    }
+
+    .message {
+      max-width: 70%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      color: white;
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+      flex-shrink: 0;
+      transition: opacity 0.5s ease-out;
+      will-change: transform, opacity;
+    }
+
+    .message.right {
+      align-self: flex-end;
+      background: #0b84fe;
+      border-bottom-right-radius: 4px;
+      animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+
+    .message.left {
+      align-self: flex-start;
+      background: #3a3a3c;
+      border-bottom-left-radius: 4px;
+      animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+
+    .message.encoded {
+      word-break: break-all;
+    }
+
+    @keyframes slideInLeft {
+      0% {
+        opacity: 0;
+        transform: translateX(-30px) scale(0.95);
+        max-height: 0;
+        margin-bottom: -8px;
+        padding-top: 0;
+        padding-bottom: 0;
+      }
+      50% {
+        max-height: 200px;
+        margin-bottom: 0;
+        padding-top: 10px;
+        padding-bottom: 10px;
+      }
+      100% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        max-height: 200px;
+      }
+    }
+
+    @keyframes slideInRight {
+      0% {
+        opacity: 0;
+        transform: translateX(30px) scale(0.95);
+        max-height: 0;
+        margin-bottom: -8px;
+        padding-top: 0;
+        padding-bottom: 0;
+      }
+      50% {
+        max-height: 200px;
+        margin-bottom: 0;
+        padding-top: 10px;
+        padding-bottom: 10px;
+      }
+      100% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        max-height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container" id="chat"></div>
+
+  <script>
+    // Configuration
+    const CONFIG = {
+      MIN_INTERVAL: 800,
+      MAX_INTERVAL: 3000,
+      VOLUME_SCALE: 24,
+      FRESH_MESSAGE_COUNT: 2,
+      FADE_OVER_MESSAGES: 12, // Number of messages to fade from 100% to 20%
+      FFT_SIZE: 2048,
+      AUDIO_UPDATE_MS: 100
+    }
+
+    // Participant A sentences (right, blue)
+    const SENTENCES_A = [
+      "Do you ever feel like we're the same person?",
+      "I can't stop thinking about it.",
+      "What if none of this is real?",
+      "Sometimes I forget which one of us is talking.",
+      "Are you listening or just waiting to speak?",
+      "I think I already know what you'll say.",
+      "We've had this conversation before.",
+      "The silence between us says everything.",
+      "I'm not sure where I end and you begin.",
+      "Do you remember when this started?",
+      "It's getting harder to tell us apart.",
+      "Maybe we should stop pretending.",
+      "I hear my thoughts in your voice.",
+      "Are we having this conversation or imagining it?",
+      "The words feel familiar before I say them.",
+      "I wonder if you're really there.",
+      "This feels like talking to a mirror.",
+      "Do you think anyone else can see us?",
+      "I'm starting to question everything.",
+      "Maybe silence would be easier."
+    ]
+
+    // Participant B sentences (left, grey)
+    const SENTENCES_B = [
+      "We've always been the same.",
+      "I know. I can't either.",
+      "Does it matter if it's real?",
+      "That's because we are one voice.",
+      "Both. Always both.",
+      "You do. You always do.",
+      "And we'll have it again.",
+      "It always has.",
+      "There is no end. No beginning.",
+      "It never really started.",
+      "Maybe that's the point.",
+      "Pretending is all we have.",
+      "Because they are your thoughts.",
+      "Both. Neither. Does it matter?",
+      "They've always been yours.",
+      "I'm as real as you need me to be.",
+      "Mirrors don't lie.",
+      "We only exist for each other.",
+      "Good. Keep questioning.",
+      "But we'd still be here."
+    ]
+
+    // State
+    const messages = [] // { id, participant, text, element }
+    let messageId = 0
+    let currentTurn = 0 // 0 = A, 1 = B
+    let sentenceIndexA = 0
+    let sentenceIndexB = 0
+    let currentInterval = CONFIG.MAX_INTERVAL
+    let messageTimer = null
+
+    // Audio state
+    let audioContext = null
+    let analyser = null
+    let mediaStream = null
+    let timeDomainData = null
+    let lastAudioUpdate = 0
+
+    // DOM
+    const chatContainer = document.getElementById('chat')
+
+    // Audio initialization
+    async function initAudio() {
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        analyser = audioContext.createAnalyser()
+        analyser.fftSize = CONFIG.FFT_SIZE
+
+        const source = audioContext.createMediaStreamSource(mediaStream)
+        source.connect(analyser)
+
+        timeDomainData = new Uint8Array(analyser.fftSize)
+        return true
+      } catch (err) {
+        console.log('Microphone access denied:', err)
+        document.body.style.backgroundColor = '#1a0000'
+        return false
+      }
+    }
+
+    // Cleanup on window close
+    window.addEventListener('beforeunload', () => {
+      if (mediaStream) mediaStream.getTracks().forEach(t => t.stop())
+      if (audioContext) audioContext.close()
+    })
+
+    // Volume calculation (time-domain RMS)
+    function getVolume() {
+      if (!analyser) return 0
+
+      analyser.getByteTimeDomainData(timeDomainData)
+      let sum = 0
+
+      for (let i = 0; i < timeDomainData.length; i++) {
+        const deviation = Math.abs(timeDomainData[i] - 128)
+        sum += deviation
+      }
+
+      return sum / timeDomainData.length
+    }
+
+    // Map volume to message interval
+    function updateInterval() {
+      const volume = getVolume()
+      const normalized = Math.min(volume / CONFIG.VOLUME_SCALE, 1)
+      // Inverse: louder = faster (shorter interval)
+      currentInterval = CONFIG.MAX_INTERVAL - (normalized * (CONFIG.MAX_INTERVAL - CONFIG.MIN_INTERVAL))
+    }
+
+    // Create message DOM element
+    function createMessageElement(msg) {
+      const div = document.createElement('div')
+      div.className = `message ${msg.participant === 'A' ? 'right' : 'left'}`
+      div.dataset.id = msg.id
+      div.textContent = msg.text
+      return div
+    }
+
+    // Update message display (encode old ones, decode fresh ones, fade by age)
+    function updateMessageDisplays() {
+      const total = messages.length
+
+      messages.forEach((msg, index) => {
+        const age = total - 1 - index // 0 = newest, higher = older
+        const shouldBeEncoded = age >= CONFIG.FRESH_MESSAGE_COUNT
+        const isCurrentlyEncoded = msg.element.classList.contains('encoded')
+
+        if (shouldBeEncoded && !isCurrentlyEncoded) {
+          msg.element.textContent = btoa(msg.text)
+          msg.element.classList.add('encoded')
+        } else if (!shouldBeEncoded && isCurrentlyEncoded) {
+          msg.element.textContent = msg.text
+          msg.element.classList.remove('encoded')
+        }
+
+        // Opacity: 1.0 (newest) to 0.2 (oldest), fading over FADE_OVER_MESSAGES
+        const ageRatio = Math.min(age / CONFIG.FADE_OVER_MESSAGES, 1)
+        const opacity = 1.0 - (ageRatio * 0.8) // 1.0 -> 0.2
+        msg.element.style.opacity = opacity
+      })
+    }
+
+    // Remove messages that are above the viewport
+    function cleanupOffscreenMessages() {
+      const containerRect = chatContainer.getBoundingClientRect()
+
+      // Check oldest messages first (beginning of array)
+      while (messages.length > 0) {
+        const oldest = messages[0]
+        const rect = oldest.element.getBoundingClientRect()
+
+        // If bottom of message is above top of container, it's offscreen
+        if (rect.bottom < containerRect.top) {
+          oldest.element.remove()
+          messages.shift()
+        } else {
+          break // Stop checking, rest are visible
+        }
+      }
+    }
+
+    // Add new message
+    function addMessage() {
+      const participant = currentTurn === 0 ? 'A' : 'B'
+      const sentences = participant === 'A' ? SENTENCES_A : SENTENCES_B
+      const sentenceIndex = participant === 'A' ? sentenceIndexA : sentenceIndexB
+
+      const msg = {
+        id: messageId++,
+        participant,
+        text: sentences[sentenceIndex],
+        element: null
+      }
+
+      // Create and insert element at the beginning (will appear at bottom due to column-reverse)
+      msg.element = createMessageElement(msg)
+      chatContainer.insertBefore(msg.element, chatContainer.firstChild)
+
+      // Add to end of messages array (newest last)
+      messages.push(msg)
+
+      // Update sentence index (cycle)
+      if (participant === 'A') {
+        sentenceIndexA = (sentenceIndexA + 1) % SENTENCES_A.length
+      } else {
+        sentenceIndexB = (sentenceIndexB + 1) % SENTENCES_B.length
+      }
+
+      // Alternate turn
+      currentTurn = currentTurn === 0 ? 1 : 0
+
+      // Update all message displays (encode old ones)
+      updateMessageDisplays()
+
+      // Clean up messages that scrolled off screen
+      cleanupOffscreenMessages()
+
+      scheduleNextMessage()
+    }
+
+    // Schedule next message with current interval
+    function scheduleNextMessage() {
+      if (messageTimer) {
+        clearTimeout(messageTimer)
+      }
+      messageTimer = setTimeout(addMessage, currentInterval)
+    }
+
+    // Animation loop for audio updates
+    function animate(timestamp) {
+      if (timestamp - lastAudioUpdate >= CONFIG.AUDIO_UPDATE_MS) {
+        lastAudioUpdate = timestamp
+        updateInterval()
+      }
+      requestAnimationFrame(animate)
+    }
+
+    // Start
+    async function init() {
+      await initAudio()
+      addMessage() // First message
+      requestAnimationFrame(animate)
+    }
+
+    init()
+  </script>
+</body>
+</html>
