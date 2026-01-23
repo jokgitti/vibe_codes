@@ -38,5 +38,8 @@ export const state = {
   // Grid state (for grid pattern)
   gridCells: [],
   gridCols: 0,
-  gridRows: 0
+  gridRows: 0,
+
+  // Z-index management for dragging
+  currentZIndex: 1
 };

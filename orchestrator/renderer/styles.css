@@ -268,6 +268,11 @@ button:active {
   align-items: center;
   padding: 0 2px;
   gap: 2px;
+  cursor: grab;
+}
+
+.win98-titlebar:active {
+  cursor: grabbing;
 }
 
 .win98-titlebar.inactive {
@@ -332,30 +337,30 @@ button:active {
   border: none;
 }
 
-/* Modal Overlay */
+/* Modal Overlay (transparent, just for z-index stacking) */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
   display: none;
-  justify-content: center;
-  align-items: center;
+  pointer-events: none;
   z-index: 1000;
 }
 
 .modal-overlay.visible {
-  display: flex;
+  display: block;
 }
 
-/* Modal Window */
+/* Modal Window (draggable) */
 .modal {
+  position: absolute;
   background: #c0c0c0;
   border: 2px outset #dfdfdf;
   box-shadow: 4px 4px 0 #000;
   min-width: 250px;
+  pointer-events: auto;
 }
 
 .modal-title {
@@ -364,6 +369,11 @@ button:active {
   font-size: 12px;
   font-weight: bold;
   padding: 4px 8px;
+  cursor: grab;
+}
+
+.modal-title:active {
+  cursor: grabbing;
 }
 
 .modal-content {

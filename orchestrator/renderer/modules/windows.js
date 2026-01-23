@@ -5,6 +5,7 @@
 import { CONFIG, PROJECTS } from './config.js';
 import { state } from './state.js';
 import { updateUI, setStatus } from './ui.js';
+import { makeDraggable } from './drag.js';
 
 let windowContainer;
 
@@ -271,6 +272,9 @@ export function createVirtualWindowWithProject(project) {
   windowEl.appendChild(titleBar);
   windowEl.appendChild(content);
   windowContainer.appendChild(windowEl);
+
+  // Make window draggable by title bar
+  makeDraggable(windowEl, titleBar);
 
   // Track window
   const win = { id, element: windowEl, iframe, project, gridIndex };

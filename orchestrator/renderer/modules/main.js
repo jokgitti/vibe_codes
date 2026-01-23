@@ -10,6 +10,7 @@ import { initTitleElements, initTitleAnimation } from './title.js';
 import { initWindowContainer, recalculateGrid, createVirtualWindow, closeOldestWindow, closeVirtualWindow } from './windows.js';
 import { initModal } from './modal.js';
 import { initKeyboard } from './keyboard.js';
+import { initDrag } from './drag.js';
 
 // =============================================================================
 // DOM ELEMENTS (for event handlers)
@@ -129,6 +130,7 @@ async function init() {
   initUI();
   initTitleElements();
   initWindowContainer();
+  initDrag();
   initModal();
   initKeyboard();
   initEventHandlers();

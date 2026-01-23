@@ -1,15 +1,19 @@
 // =============================================================================
-// PROJECT SELECTION MODAL
+// PROJECT SELECTION MODAL (draggable window)
 // =============================================================================
 
 import { PROJECTS } from './config.js';
+import { state } from './state.js';
 import { createVirtualWindowWithProject } from './windows.js';
+import { makeDraggable } from './drag.js';
 
-let modalOverlay, projectSelect, modalOpenBtn, modalCancelBtn;
+let modalOverlay, modal, modalTitle, projectSelect, modalOpenBtn, modalCancelBtn;
 export let modalVisible = false;
 
 export function initModal() {
   modalOverlay = document.getElementById('modalOverlay');
+  modal = modalOverlay.querySelector('.modal');
+  modalTitle = modalOverlay.querySelector('.modal-title');
   projectSelect = document.getElementById('projectSelect');
   modalOpenBtn = document.getElementById('modalOpenBtn');
   modalCancelBtn = document.getElementById('modalCancelBtn');
@@ -18,12 +22,8 @@ export function initModal() {
   modalOpenBtn.addEventListener('click', confirmProjectSelection);
   modalCancelBtn.addEventListener('click', hideProjectModal);
 
-  // Click outside modal to close
-  modalOverlay.addEventListener('click', (e) => {
-    if (e.target === modalOverlay) {
-      hideProjectModal();
-    }
-  });
+  // Make modal draggable by its title bar
+  makeDraggable(modal, modalTitle);
 }
 
 function initProjectSelect() {
@@ -38,6 +38,16 @@ function initProjectSelect() {
 
 export function showProjectModal() {
   initProjectSelect();
+
+  // Center the modal
+  modal.style.left = '50%';
+  modal.style.top = '50%';
+  modal.style.transform = 'translate(-50%, -50%)';
+
+  // Bring to front
+  state.currentZIndex++;
+  modal.style.zIndex = state.currentZIndex;
+
   modalOverlay.classList.add('visible');
   projectSelect.focus();
   modalVisible = true;
