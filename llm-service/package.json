@@ -1,0 +1,14 @@
+{
+  "name": "llm-service",
+  "version": "1.0.0",
+  "description": "Local LLM wrapper service for vibe_codes",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node --max-old-space-size=512 index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

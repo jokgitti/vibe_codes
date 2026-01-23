@@ -126,63 +126,53 @@
       FADE_OVER_MESSAGES: 12,
 
       // Audio
-      FFT_SIZE: 512
+      FFT_SIZE: 512,
+
+      // LLM Service
+      LLM_SERVICE_URL: 'http://localhost:3001'
     }
-
-    // Participant A sentences (right, blue)
-    const SENTENCES_A = [
-      "Do you ever feel like we're the same person?",
-      "I can't stop thinking about it.",
-      "What if none of this is real?",
-      "Sometimes I forget which one of us is talking.",
-      "Are you listening or just waiting to speak?",
-      "I think I already know what you'll say.",
-      "We've had this conversation before.",
-      "The silence between us says everything.",
-      "I'm not sure where I end and you begin.",
-      "Do you remember when this started?",
-      "It's getting harder to tell us apart.",
-      "Maybe we should stop pretending.",
-      "I hear my thoughts in your voice.",
-      "Are we having this conversation or imagining it?",
-      "The words feel familiar before I say them.",
-      "I wonder if you're really there.",
-      "This feels like talking to a mirror.",
-      "Do you think anyone else can see us?",
-      "I'm starting to question everything.",
-      "Maybe silence would be easier."
-    ]
-
-    // Participant B sentences (left, grey)
-    const SENTENCES_B = [
-      "We've always been the same.",
-      "I know. I can't either.",
-      "Does it matter if it's real?",
-      "That's because we are one voice.",
-      "Both. Always both.",
-      "You do. You always do.",
-      "And we'll have it again.",
-      "It always has.",
-      "There is no end. No beginning.",
-      "It never really started.",
-      "Maybe that's the point.",
-      "Pretending is all we have.",
-      "Because they are your thoughts.",
-      "Both. Neither. Does it matter?",
-      "They've always been yours.",
-      "I'm as real as you need me to be.",
-      "Mirrors don't lie.",
-      "We only exist for each other.",
-      "Good. Keep questioning.",
-      "But we'd still be here."
-    ]
 
     // Message state
     const messages = [] // { id, participant, text, element }
     let messageId = 0
     let currentTurn = 0 // 0 = A, 1 = B
-    let sentenceIndexA = 0
-    let sentenceIndexB = 0
+
+    // LLM state
+    const conversationHistory = [] // strings for /monologue endpoint
+    let nextMessage = null         // pre-fetched message
+    let isFetching = false         // prevent concurrent fetches
+
+    // ==========================================================================
+    // LLM SERVICE
+    // ==========================================================================
+
+    async function fetchNextMessage() {
+      if (isFetching) return
+      isFetching = true
+
+      try {
+        const res = await fetch(`${CONFIG.LLM_SERVICE_URL}/monologue`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ history: conversationHistory })
+        })
+
+        if (!res.ok) throw new Error(`LLM service error: ${res.status}`)
+
+        const data = await res.json()
+        nextMessage = data.message || '...'
+      } catch (err) {
+        console.error('[LLM] Fetch failed:', err.message)
+        nextMessage = '...'
+      } finally {
+        isFetching = false
+      }
+    }
+
+    // Pre-fetch the first message on startup
+    async function initLLM() {
+      await fetchNextMessage()
+    }
 
     // ==========================================================================
     // EXTERNAL AUDIO (from orchestrator)
@@ -323,14 +313,16 @@
 
     // Add new message
     function addMessage() {
+      // Ignore beats while fetching - wait for response
+      if (!nextMessage) return
+
       const participant = currentTurn === 0 ? 'A' : 'B'
-      const sentences = participant === 'A' ? SENTENCES_A : SENTENCES_B
-      const sentenceIndex = participant === 'A' ? sentenceIndexA : sentenceIndexB
+      const text = nextMessage
 
       const msg = {
         id: messageId++,
         participant,
-        text: sentences[sentenceIndex],
+        text,
         element: null
       }
 
@@ -341,12 +333,16 @@
       // Add to end of messages array (newest last)
       messages.push(msg)
 
-      // Update sentence index (cycle)
-      if (participant === 'A') {
-        sentenceIndexA = (sentenceIndexA + 1) % SENTENCES_A.length
-      } else {
-        sentenceIndexB = (sentenceIndexB + 1) % SENTENCES_B.length
+      // Add to conversation history for LLM context
+      conversationHistory.push(text)
+      // Keep history manageable (last 20 messages)
+      if (conversationHistory.length > 20) {
+        conversationHistory.shift()
       }
+
+      // Clear current and pre-fetch next message
+      nextMessage = null
+      fetchNextMessage()
 
       // Alternate turn
       currentTurn = currentTurn === 0 ? 1 : 0
@@ -389,6 +385,7 @@
     // Start
     async function init() {
       await initAudio()
+      await initLLM() // Fetch first message from LLM
       addMessage() // First message
       requestAnimationFrame(animate)
     }
