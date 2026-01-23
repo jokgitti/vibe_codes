@@ -4,8 +4,8 @@
 
 const CONFIG = {
   // Window sizing
-  WINDOW_WIDTH: 350,
-  WINDOW_HEIGHT: 350,
+  WINDOW_WIDTH: 400,
+  WINDOW_HEIGHT: 400,
   WINDOW_GAP: 10,
   TITLEBAR_HEIGHT: 18,
   CHROME_PADDING: 8, // borders + margins
