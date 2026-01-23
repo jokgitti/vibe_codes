@@ -49,20 +49,38 @@
       pathSpeed: 0.000075,      // Speed of characters moving along path
     };
 
-    // Audio-reactive speed settings
+    // Audio-reactive speed settings (time-domain volume typically 0-30)
     const MIN_HIGHLIGHT_SPEED = config.pathSpeed * 1.2;  // 20% faster than path in silence
     const MAX_HIGHLIGHT_SPEED = 0.0004;                   // ~5x pathSpeed when loud
-    const VOLUME_SCALE = 24;                              // Sensitivity (lower = more sensitive)
+    const VOLUME_SCALE = 15;                              // Sensitivity (lower = more sensitive)
     const SPEED_UPDATE_INTERVAL = 100;                    // ms between speed updates
 
-    // Audio state
+    // Audio settings (standardized)
+    const FFT_SIZE = 512;
+
+    // ==========================================================================
+    // EXTERNAL AUDIO (from orchestrator)
+    // ==========================================================================
+
+    let externalAudio = null;
+
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'audio') {
+        externalAudio = e.data;
+        document.body.style.backgroundColor = 'black';
+      }
+    });
+
+    // ==========================================================================
+    // LOCAL AUDIO (standalone mode)
+    // ==========================================================================
+
     let audioContext = null;
     let analyser = null;
     let timeDomainData = null;
-    let currentVolume = 0;
     let currentHighlightSpeed = MIN_HIGHLIGHT_SPEED;
     let lastSpeedUpdate = 0;
-    let mediaStream = null;  // Keep reference to stop on close
+    let mediaStream = null;
 
     // Word list (20 words, max 6 characters)
     const words = [
@@ -99,6 +117,31 @@
     let pathLength = 0;
     let scale = 1;
 
+    // Path cache for performance (avoid getPointAtLength every frame)
+    const PATH_CACHE_RESOLUTION = 360; // Sample points around the path
+    let pathCache = []; // [{x, y, angle}, ...]
+
+    // Text cache (avoid recalculating every frame)
+    let cachedCharCount = 0;
+    let cachedPathText = '';
+
+    // Build path cache - call once at setup and on shape change
+    function buildPathCache() {
+      pathCache = [];
+      for (let i = 0; i < PATH_CACHE_RESOLUTION; i++) {
+        const t = i / PATH_CACHE_RESOLUTION;
+        const distance = t * pathLength;
+        const point = pathElement.getPointAtLength(distance);
+
+        // Get next point for angle calculation
+        const nextDistance = ((i + 1) % PATH_CACHE_RESOLUTION) / PATH_CACHE_RESOLUTION * pathLength;
+        const nextPoint = pathElement.getPointAtLength(nextDistance);
+        const angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x);
+
+        pathCache.push({ x: point.x, y: point.y, angle });
+      }
+    }
+
     // Randomly select shape and word (called once at startup)
     function selectShapeAndWord() {
       const randomPathKey = pathKeys[Math.floor(Math.random() * pathKeys.length)];
@@ -107,6 +150,8 @@
       pathElement.setAttribute('d', paths[randomPathKey]);
       config.targetWord = randomWord;
       pathLength = pathElement.getTotalLength();
+      buildPathCache(); // Pre-compute path points
+      updateTextCache(); // Update text after path is ready
     }
 
     // Initialize audio for reactive highlight speed
@@ -115,15 +160,16 @@
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
+        analyser.fftSize = FFT_SIZE;
+        analyser.smoothingTimeConstant = 0.3;
 
         const source = audioContext.createMediaStreamSource(mediaStream);
         source.connect(analyser);
 
         timeDomainData = new Uint8Array(analyser.fftSize);
       } catch (err) {
-        console.log('Microphone access denied - using static speed');
-        document.body.style.backgroundColor = 'red';
+        console.log('Microphone access denied - will use external audio if available');
+        // Don't set red background - external audio may come in
       }
     }
 
@@ -137,22 +183,25 @@
       }
     });
 
-    // Calculate volume from time-domain data
-    function getVolume() {
+    // Get local volume (standalone mode)
+    function getLocalVolume() {
       if (!analyser) return 0;
-
       analyser.getByteTimeDomainData(timeDomainData);
       let sum = 0;
       for (let i = 0; i < timeDomainData.length; i++) {
-        const deviation = Math.abs(timeDomainData[i] - 128);
-        sum += deviation;
+        sum += Math.abs(timeDomainData[i] - 128);
       }
       return sum / timeDomainData.length;
     }
 
-    // Calculate dynamic highlight speed based on volume
+    // Calculate dynamic highlight speed based on normalized volume
     function getHighlightSpeed() {
-      const normalized = Math.min(currentVolume / VOLUME_SCALE, 1);
+      // Use pre-computed normalizedVolume from orchestrator
+      if (externalAudio && externalAudio.normalizedVolume !== undefined) {
+        return MIN_HIGHLIGHT_SPEED + externalAudio.normalizedVolume * (MAX_HIGHLIGHT_SPEED - MIN_HIGHLIGHT_SPEED);
+      }
+      // Fallback to local volume calculation
+      const normalized = Math.min(getLocalVolume() / VOLUME_SCALE, 1);
       return MIN_HIGHLIGHT_SPEED + normalized * (MAX_HIGHLIGHT_SPEED - MIN_HIGHLIGHT_SPEED);
     }
 
@@ -163,6 +212,14 @@
       // Scale based on the smaller dimension, targeting 80% of viewport
       const minDimension = Math.min(canvas.width, canvas.height);
       scale = (minDimension * 0.8) / 400; // 400 is the base path size
+      updateTextCache();
+    }
+
+    // Update cached text values (call on resize or word change)
+    function updateTextCache() {
+      if (pathLength === 0) return; // Path not ready yet
+      cachedCharCount = calculateCharacterCount();
+      cachedPathText = generatePathText(cachedCharCount);
     }
 
     // Calculate how many characters fit on the path
@@ -182,19 +239,28 @@
     }
 
     // Get position and angle on SVG path at a given fraction (0 to 1)
+    // Uses cached points with linear interpolation for performance
     function getPositionOnPath(t, centerX, centerY) {
-      const distance = t * pathLength;
-      const point = pathElement.getPointAtLength(distance);
+      // Normalize t to [0, 1)
+      t = t - Math.floor(t);
 
-      // Get a nearby point to calculate angle
-      const delta = 0.1;
-      const nextPoint = pathElement.getPointAtLength(Math.min(distance + delta, pathLength));
-      const angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x);
+      // Find the two cached points to interpolate between
+      const exactIndex = t * PATH_CACHE_RESOLUTION;
+      const index0 = Math.floor(exactIndex) % PATH_CACHE_RESOLUTION;
+      const index1 = (index0 + 1) % PATH_CACHE_RESOLUTION;
+      const frac = exactIndex - Math.floor(exactIndex);
+
+      const p0 = pathCache[index0];
+      const p1 = pathCache[index1];
+
+      // Linear interpolation
+      const x = p0.x + (p1.x - p0.x) * frac;
+      const y = p0.y + (p1.y - p0.y) * frac;
 
       return {
-        x: centerX + point.x * scale,
-        y: centerY + point.y * scale,
-        angle: angle,
+        x: centerX + x * scale,
+        y: centerY + y * scale,
+        angle: p0.angle, // Use nearest angle (good enough for text)
       };
     }
 
@@ -218,8 +284,7 @@
       const deltaTime = timestamp - lastTime;
       lastTime = timestamp;
 
-      // Update audio volume and highlight speed (throttled)
-      currentVolume = getVolume();
+      // Update highlight speed (throttled)
       if (timestamp - lastSpeedUpdate >= SPEED_UPDATE_INTERVAL) {
         lastSpeedUpdate = timestamp;
         currentHighlightSpeed = getHighlightSpeed();
@@ -239,30 +304,28 @@
 
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
-      const charCount = calculateCharacterCount();
-      const pathText = generatePathText(charCount);
 
       // Set font
       ctx.font = `${config.fontSize}px ${config.fontFamily}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // Draw each character
-      for (let i = 0; i < charCount; i++) {
+      // Draw each character using cached values
+      for (let i = 0; i < cachedCharCount; i++) {
         // Calculate position along path (0 to 1) with animation offset
-        const baseT = i / charCount;
+        const baseT = i / cachedCharCount;
         const animatedT = (baseT + pathOffset) % 1;
 
         const pos = getPositionOnPath(animatedT, centerX, centerY);
 
         // Determine if this character is highlighted
-        const highlighted = isHighlighted(i, charCount, highlightOffset);
+        const highlighted = isHighlighted(i, cachedCharCount, highlightOffset);
         const opacity = highlighted ? config.highlightOpacity : config.defaultOpacity;
 
         ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
 
         // Draw character (always upright)
-        ctx.fillText(pathText[i], pos.x, pos.y);
+        ctx.fillText(cachedPathText[i], pos.x, pos.y);
       }
 
       requestAnimationFrame(render);

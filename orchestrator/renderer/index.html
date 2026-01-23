@@ -3,45 +3,83 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
-  <title>Orchestrator</title>
+  <title>Orchestrator v2</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>ORCHESTRATOR</h1>
+  <div class="app">
+    <!-- Control Panel Sidebar (hidden by default, Cmd+I to toggle) -->
+    <aside class="control-panel hidden">
+      <h1>orchestrator</h1>
 
-    <div class="stats">
-      <div class="stat-row">
-        <span class="label">Windows:</span>
-        <div class="bar-container">
-          <div class="bar" id="windowBar"></div>
+      <div class="stats">
+        <div class="stat-row">
+          <span class="label">windows</span>
+          <div class="bar-container">
+            <div class="bar" id="windowBar"></div>
+          </div>
+          <span class="count" id="windowCount">0/50</span>
         </div>
-        <span class="count" id="windowCount">0/20</span>
+
+        <div class="stat-row">
+          <span class="label">audio</span>
+          <div class="bar-container">
+            <div class="bar audio-bar" id="audioBar"></div>
+          </div>
+        </div>
+
+        <div class="stat-row slider-row">
+          <span class="label">sensitivity</span>
+          <input type="range" id="sensitivitySlider" min="0.5" max="2" step="0.1" value="1">
+          <span class="count" id="sensitivityValue">1.0x</span>
+        </div>
+
+        <div class="stat-row">
+          <span class="label">pattern</span>
+          <select id="patternSelect">
+            <option value="random">random</option>
+            <option value="grid">grid fill</option>
+            <option value="spiral">spiral</option>
+            <option value="cascade">cascade</option>
+            <option value="burst">center burst</option>
+          </select>
+        </div>
       </div>
 
-      <div class="stat-row">
-        <span class="label">Audio:</span>
-        <div class="bar-container">
-          <div class="bar audio-bar" id="audioBar"></div>
+      <div class="status" id="status">Initializing...</div>
+
+      <div class="controls">
+        <button id="openBtn">open</button>
+        <button id="closeBtn">close</button>
+      </div>
+    </aside>
+
+    <!-- Virtual Window Container -->
+    <main class="window-container" id="windowContainer">
+      <!-- Virtual windows (iframes with Win98 chrome) will be added here -->
+
+      <!-- Title overlay (shown when auto-open is off) -->
+      <div class="title-overlay" id="titleOverlay">
+        <div class="title-letters" id="titleLetters"></div>
+        <p class="subtitle" id="subtitle">press cmd + s to vibe</p>
+      </div>
+    </main>
+
+    <!-- Project Selection Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal">
+        <div class="modal-title">open project</div>
+        <div class="modal-content">
+          <select id="projectSelect"></select>
+        </div>
+        <div class="modal-buttons">
+          <button id="modalOpenBtn">open</button>
+          <button id="modalCancelBtn">cancel</button>
         </div>
       </div>
-    </div>
-
-    <div class="stat-row slider-row">
-      <span class="label">Sensitivity:</span>
-      <input type="range" id="sensitivitySlider" min="0.5" max="2" step="0.1" value="1">
-      <span class="count" id="sensitivityValue">1.0x</span>
-    </div>
-
-    <div class="status" id="status">Initializing...</div>
-
-    <div class="controls">
-      <button id="openBtn">Open Window</button>
-      <button id="closeBtn">Close Window</button>
     </div>
   </div>
 
-  <script src="renderer.js"></script>
+  <script type="module" src="modules/main.js"></script>
 </body>
 </html>

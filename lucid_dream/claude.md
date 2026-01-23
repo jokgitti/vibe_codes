@@ -15,7 +15,7 @@ A slot-machine-style text animation that cycles through random letters before re
 
 The display alternates between two states:
 
-**OFF State (3.5 seconds):**
+**OFF State (1.7 seconds):**
 - All letters cycle through the alphabet continuously
 - Each digit has an offset (3 positions apart) creating a wave effect
 - Letters appear dimmed (40% opacity)
@@ -38,9 +38,10 @@ MAX_ON_OPACITY = 1.0  // Loud
 VOLUME_SCALE = 24     // Sensitivity (lower = more sensitive)
 ```
 
-Uses time-domain audio analysis (same approach as `pitchy_soundwave`):
+Uses frequency-domain audio analysis (aligned with `rotating_gliph` and `tlkn_2_mslf`):
 - Captures microphone via `getUserMedia`
-- Analyzes amplitude using `getByteTimeDomainData()`
+- Analyzes frequency data using `getByteFrequencyData()`
+- Kick frequencies (< 150Hz) boosted 2x for better bass response
 - Maps volume to opacity range
 - Updates throttled to 100ms intervals for smooth transitions
 
@@ -73,7 +74,7 @@ The offset between digits (`OFFSET_PER_DIGIT = 3`) creates visual interest - let
 | Parameter | Default | Effect |
 |-----------|---------|--------|
 | `CYCLE_INTERVAL` | 50ms | Speed of letter cycling in off state |
-| `OFF_STATE_DURATION` | 3500ms | Time spent in off state |
+| `OFF_STATE_DURATION` | 1700ms | Time spent in off state |
 | `ON_STATE_DURATION` | 7000ms | Time spent in on state |
 | `OFFSET_PER_DIGIT` | 3 | Alphabet offset between adjacent digits |
 | `CHAR_TRANSITION_TIME` | 200ms | Delay between each character reveal/hide |
@@ -82,6 +83,7 @@ The offset between digits (`OFFSET_PER_DIGIT = 3`) creates visual interest - let
 | `MAX_ON_OPACITY` | 1.0 | Maximum opacity when ON (loud) |
 | `VOLUME_SCALE` | 24 | Volume value that maps to max opacity |
 | `OPACITY_UPDATE_INTERVAL` | 100ms | Throttle for opacity updates |
+| `FFT_SIZE` | 512 | Audio buffer size (aligned with other projects) |
 
 ## Word Pool
 

@@ -113,26 +113,21 @@
   <div class="chat-container" id="chat"></div>
 
   <script>
-    // Configuration
+    // Configuration (standardized across all projects)
     const CONFIG = {
-      // Beat detection
-      BEAT_THRESHOLD: 1.25,      // Volume must be 25% above average to trigger
+      // Beat detection (time-domain volume typically 0-30)
+      BEAT_THRESHOLD: 1.3,       // Volume must be 30% above average to trigger
       BEAT_COOLDOWN: 300,        // ms between messages
       VOLUME_HISTORY_SIZE: 30,   // ~0.5 seconds at 60fps
-      MIN_VOLUME: 5,             // Minimum average volume (avoid silence triggering)
+      MIN_VOLUME: 2,             // Minimum average volume (avoid silence triggering)
 
       // Display
       FRESH_MESSAGE_COUNT: 2,
       FADE_OVER_MESSAGES: 12,
 
       // Audio
-      FFT_SIZE: 512,
-      SAMPLE_RATE: 44100
+      FFT_SIZE: 512
     }
-
-    // Frequency bands (same as rotating_gliph)
-    const BIN_WIDTH = CONFIG.SAMPLE_RATE / CONFIG.FFT_SIZE
-    const KICK_HIGH = 150 // Kick drum range upper bound
 
     // Participant A sentences (right, blue)
     const SENTENCES_A = [
@@ -189,13 +184,33 @@
     let sentenceIndexA = 0
     let sentenceIndexB = 0
 
-    // Audio state
+    // ==========================================================================
+    // EXTERNAL AUDIO (from orchestrator)
+    // ==========================================================================
+
+    let externalAudio = null
+
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'audio') {
+        externalAudio = e.data
+        document.body.style.backgroundColor = 'black'
+        // React to beat from orchestrator
+        if (e.data.beat) {
+          addMessage()
+        }
+      }
+    })
+
+    // ==========================================================================
+    // LOCAL AUDIO (standalone mode)
+    // ==========================================================================
+
     let audioContext = null
     let analyser = null
     let mediaStream = null
-    let frequencyData = null
+    let timeDomainData = null
 
-    // Beat detection state
+    // Beat detection (standalone mode only)
     const volumeHistory = []
     let lastBeatTime = 0
 
@@ -214,7 +229,7 @@
         const source = audioContext.createMediaStreamSource(mediaStream)
         source.connect(analyser)
 
-        frequencyData = new Uint8Array(analyser.frequencyBinCount)
+        timeDomainData = new Uint8Array(analyser.fftSize)
         return true
       } catch (err) {
         console.log('Microphone access denied:', err)
@@ -229,24 +244,22 @@
       if (audioContext) audioContext.close()
     })
 
-    // Volume calculation (frequency domain with kick boost)
+    // Volume calculation (time-domain analysis)
     function getVolume() {
-      if (!analyser) return 0
-
-      analyser.getByteFrequencyData(frequencyData)
-      let sum = 0
-      const kickEnd = Math.floor(KICK_HIGH / BIN_WIDTH)
-
-      for (let i = 0; i < frequencyData.length; i++) {
-        // Boost kick frequencies by 2x
-        if (i < kickEnd) {
-          sum += frequencyData[i] * 2
-        } else {
-          sum += frequencyData[i]
-        }
+      // Use external audio data if available (orchestrator mode)
+      if (externalAudio && externalAudio.volume !== undefined) {
+        return externalAudio.volume
       }
 
-      return sum / frequencyData.length
+      // Fallback to local audio (standalone mode)
+      if (!analyser) return 0
+
+      analyser.getByteTimeDomainData(timeDomainData)
+      let sum = 0
+      for (let i = 0; i < timeDomainData.length; i++) {
+        sum += Math.abs(timeDomainData[i] - 128)
+      }
+      return sum / timeDomainData.length
     }
 
     // Get average volume from history
@@ -345,25 +358,23 @@
       cleanupOffscreenMessages()
     }
 
-    // Analyze audio and detect beats
-    function analyzeAudio(currentTime) {
-      if (!analyser) return
+    // Local beat detection (standalone mode only)
+    function analyzeLocalAudio(currentTime) {
+      // Skip if using external audio or no local analyser
+      if (externalAudio || !analyser) return
 
       const volume = getVolume()
       const avgVolume = getAverageVolume()
 
-      // Update volume history
       volumeHistory.push(volume)
       if (volumeHistory.length > CONFIG.VOLUME_HISTORY_SIZE) {
         volumeHistory.shift()
       }
 
-      // Beat detection
       const timeSinceLastBeat = currentTime - lastBeatTime
       if (volume > avgVolume * CONFIG.BEAT_THRESHOLD &&
           timeSinceLastBeat > CONFIG.BEAT_COOLDOWN &&
           avgVolume > CONFIG.MIN_VOLUME) {
-
         lastBeatTime = currentTime
         addMessage()
       }
@@ -371,7 +382,7 @@
 
     // Animation loop
     function animate(timestamp) {
-      analyzeAudio(timestamp)
+      analyzeLocalAudio(timestamp)
       requestAnimationFrame(animate)
     }
 
