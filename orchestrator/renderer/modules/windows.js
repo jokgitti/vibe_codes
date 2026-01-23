@@ -1,0 +1,330 @@
+// =============================================================================
+// VIRTUAL WINDOW MANAGEMENT & POSITIONING
+// =============================================================================
+
+import { CONFIG, PROJECTS } from './config.js';
+import { state } from './state.js';
+import { updateUI, setStatus } from './ui.js';
+
+let windowContainer;
+
+export function initWindowContainer() {
+  windowContainer = document.getElementById('windowContainer');
+}
+
+// =============================================================================
+// GRID CALCULATION
+// =============================================================================
+
+export function recalculateGrid() {
+  if (!windowContainer) return;
+
+  const containerWidth = windowContainer.clientWidth;
+  const containerHeight = windowContainer.clientHeight;
+
+  const totalWindowWidth = CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING;
+  const totalWindowHeight = CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+
+  state.gridCols = Math.floor((containerWidth - CONFIG.WINDOW_GAP) / (totalWindowWidth + CONFIG.WINDOW_GAP));
+  state.gridRows = Math.floor((containerHeight - CONFIG.WINDOW_GAP) / (totalWindowHeight + CONFIG.WINDOW_GAP));
+
+  state.gridCols = Math.max(1, state.gridCols);
+  state.gridRows = Math.max(1, state.gridRows);
+
+  state.gridCells = new Array(state.gridCols * state.gridRows).fill(null);
+
+  // Re-assign existing windows to grid cells
+  state.virtualWindows.forEach((win, idx) => {
+    if (idx < state.gridCells.length) {
+      state.gridCells[idx] = win.id;
+      win.gridIndex = idx;
+    }
+  });
+}
+
+function getGridPosition(index) {
+  const totalWindowWidth = CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING;
+  const totalWindowHeight = CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+
+  const col = index % state.gridCols;
+  const row = Math.floor(index / state.gridCols);
+
+  return {
+    x: CONFIG.WINDOW_GAP + col * (totalWindowWidth + CONFIG.WINDOW_GAP),
+    y: CONFIG.WINDOW_GAP + row * (totalWindowHeight + CONFIG.WINDOW_GAP)
+  };
+}
+
+// =============================================================================
+// POSITIONING PATTERNS
+// =============================================================================
+
+export function getNextPosition() {
+  switch (state.currentPattern) {
+    case 'grid': return getGridFillPosition();
+    case 'spiral': return getSpiralPosition();
+    case 'random': return getRandomPosition();
+    case 'cascade': return getCascadePosition();
+    case 'burst': return getCenterBurstPosition();
+    default: return getGridFillPosition();
+  }
+}
+
+function getGridFillPosition() {
+  // Find first empty cell
+  for (let i = 0; i < state.gridCells.length; i++) {
+    if (state.gridCells[i] === null) {
+      return { ...getGridPosition(i), gridIndex: i };
+    }
+  }
+  // All full, return last position
+  return { ...getGridPosition(state.gridCells.length - 1), gridIndex: -1 };
+}
+
+function getSpiralPosition() {
+  // Generate spiral order from center
+  const centerCol = Math.floor(state.gridCols / 2);
+  const centerRow = Math.floor(state.gridRows / 2);
+  const spiralOrder = generateSpiralOrder(centerCol, centerRow, state.gridCols, state.gridRows);
+
+  for (const idx of spiralOrder) {
+    if (state.gridCells[idx] === null) {
+      return { ...getGridPosition(idx), gridIndex: idx };
+    }
+  }
+  return { ...getGridPosition(0), gridIndex: -1 };
+}
+
+function generateSpiralOrder(cx, cy, cols, rows) {
+  const order = [];
+  const visited = new Set();
+  const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]]; // right, down, left, up
+  let x = cx, y = cy;
+  let dirIdx = 0;
+  let steps = 1;
+  let stepCount = 0;
+  let turnCount = 0;
+
+  const maxCells = cols * rows;
+  while (order.length < maxCells) {
+    if (x >= 0 && x < cols && y >= 0 && y < rows) {
+      const idx = y * cols + x;
+      if (!visited.has(idx)) {
+        visited.add(idx);
+        order.push(idx);
+      }
+    }
+
+    x += dirs[dirIdx][0];
+    y += dirs[dirIdx][1];
+    stepCount++;
+
+    if (stepCount >= steps) {
+      stepCount = 0;
+      dirIdx = (dirIdx + 1) % 4;
+      turnCount++;
+      if (turnCount >= 2) {
+        turnCount = 0;
+        steps++;
+      }
+    }
+  }
+  return order;
+}
+
+function getRandomPosition() {
+  const containerWidth = windowContainer.clientWidth;
+  const containerHeight = windowContainer.clientHeight;
+  const totalWidth = CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING;
+  const totalHeight = CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+
+  // Try to find non-overlapping position
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const x = Math.random() * (containerWidth - totalWidth - CONFIG.WINDOW_GAP) + CONFIG.WINDOW_GAP;
+    const y = Math.random() * (containerHeight - totalHeight - CONFIG.WINDOW_GAP) + CONFIG.WINDOW_GAP;
+
+    let overlaps = false;
+    for (const win of state.virtualWindows) {
+      const wx = parseInt(win.element.style.left);
+      const wy = parseInt(win.element.style.top);
+      if (Math.abs(x - wx) < totalWidth && Math.abs(y - wy) < totalHeight) {
+        overlaps = true;
+        break;
+      }
+    }
+
+    if (!overlaps) {
+      return { x, y, gridIndex: -1 };
+    }
+  }
+
+  // Fallback to random
+  return {
+    x: Math.random() * (containerWidth - totalWidth),
+    y: Math.random() * (containerHeight - totalHeight),
+    gridIndex: -1
+  };
+}
+
+function getCascadePosition() {
+  const offset = 30;
+  const idx = state.virtualWindows.length;
+  const x = CONFIG.WINDOW_GAP + (idx * offset) % 300;
+  const y = CONFIG.WINDOW_GAP + (idx * offset) % 200;
+  return { x, y, gridIndex: -1 };
+}
+
+function getCenterBurstPosition() {
+  const containerWidth = windowContainer.clientWidth;
+  const containerHeight = windowContainer.clientHeight;
+  const totalWidth = CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING;
+  const totalHeight = CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+
+  // Start from center, spread out
+  const centerX = (containerWidth - totalWidth) / 2;
+  const centerY = (containerHeight - totalHeight) / 2;
+
+  const idx = state.virtualWindows.length;
+  const angle = (idx * 137.5) * (Math.PI / 180); // Golden angle
+  const radius = Math.sqrt(idx) * 80;
+
+  const x = Math.max(CONFIG.WINDOW_GAP, Math.min(containerWidth - totalWidth - CONFIG.WINDOW_GAP,
+    centerX + Math.cos(angle) * radius));
+  const y = Math.max(CONFIG.WINDOW_GAP, Math.min(containerHeight - totalHeight - CONFIG.WINDOW_GAP,
+    centerY + Math.sin(angle) * radius));
+
+  return { x, y, gridIndex: -1 };
+}
+
+// =============================================================================
+// WINDOW CREATION & DESTRUCTION
+// =============================================================================
+
+export function getRandomProject() {
+  const available = PROJECTS.filter(p => state.projectCounts[p] < CONFIG.MAX_PER_PROJECT);
+  if (available.length === 0) return null;
+  return available[Math.floor(Math.random() * available.length)];
+}
+
+export function createVirtualWindow() {
+  if (state.virtualWindows.length >= CONFIG.MAX_WINDOWS) {
+    return null;
+  }
+
+  const project = getRandomProject();
+  if (!project) return null;
+
+  return createVirtualWindowWithProject(project);
+}
+
+export function createVirtualWindowWithProject(project) {
+  if (state.virtualWindows.length >= CONFIG.MAX_WINDOWS) {
+    setStatus('max windows reached');
+    return null;
+  }
+
+  if (state.projectCounts[project] >= CONFIG.MAX_PER_PROJECT) {
+    setStatus(`max ${project} windows reached`);
+    return null;
+  }
+
+  const { x, y, gridIndex } = getNextPosition();
+  const id = state.windowIdCounter++;
+
+  // Create window element
+  const windowEl = document.createElement('div');
+  windowEl.className = 'win98-window spawning';
+  windowEl.style.left = `${x}px`;
+  windowEl.style.top = `${y}px`;
+  windowEl.style.width = `${CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING}px`;
+  windowEl.style.height = `${CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING}px`;
+
+  // Title bar
+  const titleBar = document.createElement('div');
+  titleBar.className = 'win98-titlebar';
+
+  const title = document.createElement('span');
+  title.className = 'win98-title';
+  title.textContent = project;
+
+  const buttons = document.createElement('div');
+  buttons.className = 'win98-buttons';
+
+  const closeButton = document.createElement('button');
+  closeButton.className = 'win98-btn win98-btn-close';
+  closeButton.textContent = '×';
+  closeButton.onclick = () => closeVirtualWindow(id);
+
+  buttons.appendChild(closeButton);
+  titleBar.appendChild(title);
+  titleBar.appendChild(buttons);
+
+  // Content area with iframe
+  const content = document.createElement('div');
+  content.className = 'win98-content';
+
+  const iframe = document.createElement('iframe');
+  iframe.src = `../../${project}/index.html`;
+  iframe.allow = 'microphone'; // Allow microphone for standalone mode
+
+  content.appendChild(iframe);
+  windowEl.appendChild(titleBar);
+  windowEl.appendChild(content);
+  windowContainer.appendChild(windowEl);
+
+  // Track window
+  const win = { id, element: windowEl, iframe, project, gridIndex };
+  state.virtualWindows.push(win);
+  state.projectCounts[project]++;
+
+  if (gridIndex >= 0 && gridIndex < state.gridCells.length) {
+    state.gridCells[gridIndex] = id;
+  }
+
+  // Remove spawning class after animation
+  setTimeout(() => windowEl.classList.remove('spawning'), 300);
+
+  updateUI();
+  return win;
+}
+
+export function closeVirtualWindow(id) {
+  const idx = state.virtualWindows.findIndex(w => w.id === id);
+  if (idx === -1) return;
+
+  const win = state.virtualWindows[idx];
+  win.element.classList.add('closing');
+
+  // Clear grid cell
+  if (win.gridIndex >= 0 && win.gridIndex < state.gridCells.length) {
+    state.gridCells[win.gridIndex] = null;
+  }
+
+  setTimeout(() => {
+    win.element.remove();
+    state.virtualWindows.splice(idx, 1);
+    state.projectCounts[win.project]--;
+    updateUI();
+  }, 200);
+}
+
+export function closeOldestWindow() {
+  if (state.virtualWindows.length < CONFIG.MIN_WINDOWS_TO_CLOSE) return;
+  if (state.virtualWindows.length === 0) return;
+
+  closeVirtualWindow(state.virtualWindows[0].id);
+}
+
+export function closeAllWindows() {
+  // Close from newest to oldest to avoid index issues
+  while (state.virtualWindows.length > 0) {
+    const win = state.virtualWindows[state.virtualWindows.length - 1];
+    win.element.remove();
+    if (win.gridIndex >= 0 && win.gridIndex < state.gridCells.length) {
+      state.gridCells[win.gridIndex] = null;
+    }
+    state.projectCounts[win.project]--;
+    state.virtualWindows.pop();
+  }
+  updateUI();
+}
