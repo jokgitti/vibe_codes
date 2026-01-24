@@ -59,6 +59,17 @@ body {
   height: 16px;
   background: #fff;
   border: 2px inset #808080;
+  position: relative;
+}
+
+.threshold-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ff0000;
+  left: 0%;
+  pointer-events: none;
 }
 
 .bar {
