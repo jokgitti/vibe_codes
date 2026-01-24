@@ -32,7 +32,7 @@
       border-radius: 50%;
       background-color: white;
       opacity: 0.3;
-      transition: opacity 0.05s ease;
+      transition: opacity 0.15s ease;
     }
 
     .dot.on {
@@ -68,12 +68,12 @@
       }
     }
 
-    // Draw waveform based on audio data
+    // Draw waveform based on time-domain audio data (oscilloscope style)
     function drawWaveform(dataArray) {
       clearDisplay();
 
       const step = Math.floor(dataArray.length / GRID_SIZE);
-      const sensitivity = 3; // Amplify the signal
+      const sensitivity = 1.5; // Amplify the signal
       let prevY = null;
 
       for (let x = 0; x < GRID_SIZE; x++) {
@@ -117,7 +117,7 @@
     // External audio (from orchestrator via postMessage)
     let externalAudio = null;
     let lastExternalDraw = 0;
-    const EXTERNAL_UPDATE_INTERVAL = 50; // Match standalone update rate
+    const EXTERNAL_UPDATE_INTERVAL = 150; // Slower update for dot matrix feel
 
     // Listen for external audio data from orchestrator
     window.addEventListener('message', (e) => {
@@ -162,8 +162,8 @@
           }
         }
 
-        // Update every 50ms (standalone mode)
-        localUpdateInterval = setInterval(update, 50);
+        // Update every 150ms (standalone mode)
+        localUpdateInterval = setInterval(update, 150);
       } catch (err) {
         console.log('Microphone access denied - will use external audio if available');
         // Don't set red background - external audio may come in

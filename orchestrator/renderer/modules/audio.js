@@ -2,28 +2,83 @@
 // AUDIO CAPTURE & ANALYSIS
 // =============================================================================
 
-import { CONFIG } from './config.js';
+import { CONFIG, TEST_AUDIO_FILE } from './config.js';
 import { state } from './state.js';
 import { setStatus } from './ui.js';
 
+// Audio source element (for file playback)
+let audioElement = null;
+
 export async function initAudio() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     state.analyser = state.audioContext.createAnalyser();
     state.analyser.fftSize = CONFIG.FFT_SIZE;
     state.analyser.smoothingTimeConstant = 0.3;
 
-    const source = state.audioContext.createMediaStreamSource(stream);
-    source.connect(state.analyser);
+    let source;
+
+    if (TEST_AUDIO_FILE) {
+      // File playback mode for testing
+      audioElement = new Audio();
+      audioElement.crossOrigin = 'anonymous';
+      audioElement.loop = true;
+
+      // Load file via Electron's file protocol
+      audioElement.src = `file://${TEST_AUDIO_FILE}`;
+
+      await new Promise((resolve, reject) => {
+        audioElement.addEventListener('canplaythrough', resolve, { once: true });
+        audioElement.addEventListener('error', reject, { once: true });
+      });
+
+      source = state.audioContext.createMediaElementSource(audioElement);
+      source.connect(state.analyser);
+      state.analyser.connect(state.audioContext.destination); // Play through speakers
+
+      setStatus('test audio loaded - press play');
+    } else {
+      // Microphone mode
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      source = state.audioContext.createMediaStreamSource(stream);
+      source.connect(state.analyser);
+    }
 
     state.frequencyData = new Uint8Array(state.analyser.frequencyBinCount);
     state.timeDomainData = new Uint8Array(state.analyser.fftSize);
     state.audioEnabled = true;
   } catch (err) {
-    console.error('Microphone access denied:', err);
-    setStatus('microphone access denied');
+    console.error('Audio init failed:', err);
+    setStatus('audio init failed: ' + err.message);
   }
+}
+
+export function playTestAudio() {
+  if (audioElement) {
+    audioElement.play();
+    setStatus('playing test audio');
+  }
+}
+
+export function pauseTestAudio() {
+  if (audioElement) {
+    audioElement.pause();
+    setStatus('paused');
+  }
+}
+
+export function seekTestAudio(time) {
+  if (audioElement) {
+    audioElement.currentTime = time;
+  }
+}
+
+export function getTestAudioTime() {
+  return audioElement ? audioElement.currentTime : 0;
+}
+
+export function isTestMode() {
+  return TEST_AUDIO_FILE !== null;
 }
 
 export function getVolume() {
@@ -61,13 +116,42 @@ export function broadcastAudioData(volume, beat) {
   // Normalize volume to 0-1 range (time-domain typically 0-30)
   const normalizedVolume = Math.min(volume / 15, 1);
 
+  // Compress loud signals to prevent clipping, but keep quiet signals quiet
+  let normalizedTimeDomain = [];
+  if (state.timeDomainData) {
+    // Find max deviation from center (128)
+    let maxDeviation = 0;
+    for (let i = 0; i < state.timeDomainData.length; i++) {
+      maxDeviation = Math.max(maxDeviation, Math.abs(state.timeDomainData[i] - 128));
+    }
+
+    // Only compress if signal is too hot (max deviation > 50)
+    // Don't boost quiet signals - preserve dynamic range
+    const maxAllowed = 50;
+    const scale = maxDeviation > maxAllowed ? maxAllowed / maxDeviation : 1;
+
+    normalizedTimeDomain = new Array(state.timeDomainData.length);
+    for (let i = 0; i < state.timeDomainData.length; i++) {
+      const deviation = state.timeDomainData[i] - 128;
+      normalizedTimeDomain[i] = Math.round(128 + deviation * scale);
+    }
+  }
+
+  // Get frequency data for spectrum visualizers
+  let frequencyData = [];
+  if (state.analyser && state.frequencyData) {
+    state.analyser.getByteFrequencyData(state.frequencyData);
+    frequencyData = Array.from(state.frequencyData);
+  }
+
   const data = {
     type: 'audio',
     volume,
     normalizedVolume,
     avgVolume,
     beat,
-    timeDomainData: state.timeDomainData ? Array.from(state.timeDomainData) : [],
+    timeDomainData: normalizedTimeDomain,
+    frequencyData: frequencyData,
     timestamp: performance.now()
   };
 

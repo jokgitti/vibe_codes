@@ -41,5 +41,15 @@ export const state = {
   gridRows: 0,
 
   // Z-index management for dragging
-  currentZIndex: 1
+  currentZIndex: 1,
+
+  // Beat logging for analysis
+  beatLog: [],
+  beatCount: 0,
+
+  // Onset detection history
+  onsetHistory: [],
+
+  // Pending beat flag (persists until broadcast)
+  pendingBeat: false
 };

@@ -61,18 +61,17 @@
     // Audio settings (standardized across all projects)
     const FFT_SIZE = 512;
 
-    // Audio-reactive opacity settings (time-domain volume typically 0-30)
-    const MIN_ON_OPACITY = 0.6;
+    // Beat-reactive opacity settings
+    const MIN_ON_OPACITY = 0.5;
     const MAX_ON_OPACITY = 1.0;
-    const VOLUME_SCALE = 15; // volume value that maps to max opacity (lower = more sensitive)
-    const OPACITY_UPDATE_INTERVAL = 100; // ms between opacity updates
+    const PULSE_DECAY_TIME = 200; // ms to decay from max to min after beat
 
     let isOn = false;
-    let lastOpacityUpdate = 0;
     let revealedCount = 0; // how many digits are revealed in on state
     let digits = [];
     let audioPulsingEnabled = false; // only pulse after all letters revealed + delay
     const PULSE_START_DELAY = 500; // ms to wait after full reveal before pulsing
+    let lastBeatTime = 0; // timestamp of last beat for pulse decay
 
     // ==========================================================================
     // EXTERNAL AUDIO (from orchestrator)
@@ -84,6 +83,11 @@
       if (e.data && e.data.type === 'audio') {
         externalAudio = e.data;
         document.body.style.backgroundColor = 'black';
+        // Trigger pulse on beat
+        if (e.data.beat && audioPulsingEnabled) {
+          lastBeatTime = performance.now();
+          render();
+        }
       }
     });
 
@@ -131,29 +135,25 @@
     }
 
     // ==========================================================================
-    // RENDER LOOP (throttled opacity updates)
+    // RENDER LOOP (continuous for smooth decay animation)
     // ==========================================================================
 
     function renderLoop(timestamp) {
-      // Update opacity only when pulsing is enabled (throttled)
+      // Update continuously when pulsing is enabled (for smooth decay)
       if (isOn && audioPulsingEnabled) {
-        if (timestamp - lastOpacityUpdate >= OPACITY_UPDATE_INTERVAL) {
-          lastOpacityUpdate = timestamp;
-          render();
-        }
+        render();
       }
       requestAnimationFrame(renderLoop);
     }
 
-    // Calculate dynamic opacity based on normalized volume
+    // Calculate dynamic opacity based on time since last beat
     function getOnOpacity() {
-      // Use pre-computed normalizedVolume from orchestrator
-      if (externalAudio && externalAudio.normalizedVolume !== undefined) {
-        return MIN_ON_OPACITY + externalAudio.normalizedVolume * (MAX_ON_OPACITY - MIN_ON_OPACITY);
-      }
-      // Fallback to local volume calculation
-      const normalized = Math.min(getLocalVolume() / VOLUME_SCALE, 1);
-      return MIN_ON_OPACITY + normalized * (MAX_ON_OPACITY - MIN_ON_OPACITY);
+      const timeSinceBeat = performance.now() - lastBeatTime;
+      // Decay from max to min over PULSE_DECAY_TIME
+      const decayProgress = Math.min(timeSinceBeat / PULSE_DECAY_TIME, 1);
+      // Ease out for smoother decay
+      const easedProgress = decayProgress * decayProgress;
+      return MAX_ON_OPACITY - easedProgress * (MAX_ON_OPACITY - MIN_ON_OPACITY);
     }
 
     function init() {
