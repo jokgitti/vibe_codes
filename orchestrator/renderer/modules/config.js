@@ -2,6 +2,10 @@
 // CONFIGURATION
 // =============================================================================
 
+// Test audio file for beat detection experiments
+// Set to null to use microphone input
+export const TEST_AUDIO_FILE = '/Users/lucagaleazzi/Library/Mobile Documents/com~apple~CloudDocs/Documents/Music/Ninajirachi - I Love My Computer/Ninajirachi - I Love My Computer - 08 Infohazard.wav';
+
 export const CONFIG = {
   // Window sizing
   WINDOW_WIDTH: 400,
@@ -24,6 +28,12 @@ export const CONFIG = {
   BEAT_THRESHOLD_BASE: 1.3,
   BEAT_COOLDOWN: 300,
   MIN_VOLUME_BASE: 2,
+
+  // Onset detection - detects sudden increases in volume
+  // ONSET_THRESHOLD: minimum volume increase to trigger (adjusted by sensitivity)
+  // ONSET_HISTORY: frames to compare against (shorter = more reactive)
+  ONSET_THRESHOLD_BASE: 8,
+  ONSET_HISTORY: 3,
 
   // Close detection
   CLOSE_COOLDOWN: 800,

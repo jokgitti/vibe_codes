@@ -4,7 +4,6 @@
 
 import { CONFIG } from './config.js';
 import { state } from './state.js';
-import { getAverageVolume, getBeatThreshold } from './audio.js';
 
 // DOM Elements (cached on module load)
 let windowBar, windowCountEl, audioBar, statusEl, thresholdLine;
@@ -34,10 +33,16 @@ export function updateUI() {
   const normalizedVolume = Math.min(volume / 50, 1);
   audioBar.style.width = `${normalizedVolume * 100}%`;
 
-  // Update threshold line position
-  const avgVolume = getAverageVolume();
-  const threshold = avgVolume * getBeatThreshold();
-  const normalizedThreshold = Math.min(threshold / 50, 1);
+  // Update threshold line position (onset detection)
+  // Shows: recentAvg + onsetThreshold (the level volume must exceed)
+  let recentAvg = 0;
+  if (state.onsetHistory.length > 1) {
+    const previous = state.onsetHistory.slice(0, -1);
+    recentAvg = previous.reduce((a, b) => a + b, 0) / previous.length;
+  }
+  const onsetThreshold = CONFIG.ONSET_THRESHOLD_BASE / state.sensitivity;
+  const triggerLevel = recentAvg + onsetThreshold;
+  const normalizedThreshold = Math.min(triggerLevel / 50, 1);
   thresholdLine.style.left = `${normalizedThreshold * 100}%`;
 
   const windowPercent = (state.virtualWindows.length / CONFIG.MAX_WINDOWS) * 100;

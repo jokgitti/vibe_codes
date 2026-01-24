@@ -4,7 +4,7 @@
 
 import { CONFIG } from './config.js';
 import { state } from './state.js';
-import { initAudio, getVolume, getAverageVolume, getBeatThreshold, getMinVolume, broadcastAudioData } from './audio.js';
+import { initAudio, getVolume, getAverageVolume, getBeatThreshold, getMinVolume, broadcastAudioData, playTestAudio, pauseTestAudio, seekTestAudio, isTestMode, getTestAudioTime } from './audio.js';
 import { initUI, updateUI, setStatus } from './ui.js';
 import { initTitleElements, initTitleAnimation } from './title.js';
 import { initWindowContainer, recalculateGrid, createVirtualWindow, closeOldestWindow, closeVirtualWindow } from './windows.js';
@@ -18,6 +18,9 @@ import { initDrag, makeDraggable } from './drag.js';
 
 let openBtn, closeBtn, sensitivitySlider, sensitivityValue, patternSelect;
 let controlPanelWindow, controlPanelTitlebar, controlPanelClose;
+let testControls, playBtn, restartBtn;
+let beatLogSection, beatCountEl, exportLogBtn, clearLogBtn;
+let isPlaying = false;
 
 function initDOMElements() {
   openBtn = document.getElementById('openBtn');
@@ -28,6 +31,13 @@ function initDOMElements() {
   controlPanelWindow = document.getElementById('controlPanelWindow');
   controlPanelTitlebar = document.getElementById('controlPanelTitlebar');
   controlPanelClose = document.getElementById('controlPanelClose');
+  testControls = document.getElementById('testControls');
+  playBtn = document.getElementById('playBtn');
+  restartBtn = document.getElementById('restartBtn');
+  beatLogSection = document.getElementById('beatLogSection');
+  beatCountEl = document.getElementById('beatCount');
+  exportLogBtn = document.getElementById('exportLogBtn');
+  clearLogBtn = document.getElementById('clearLogBtn');
 }
 
 function initControlPanel() {
@@ -68,6 +78,76 @@ function initEventHandlers() {
   window.addEventListener('resize', () => {
     recalculateGrid();
   });
+
+  // Test audio controls
+  playBtn.addEventListener('click', () => {
+    if (isPlaying) {
+      pauseTestAudio();
+      playBtn.textContent = 'play';
+      isPlaying = false;
+    } else {
+      playTestAudio();
+      playBtn.textContent = 'pause';
+      isPlaying = true;
+    }
+  });
+
+  restartBtn.addEventListener('click', () => {
+    seekTestAudio(0);
+    clearBeatLog();
+    if (!isPlaying) {
+      playTestAudio();
+      playBtn.textContent = 'pause';
+      isPlaying = true;
+    }
+  });
+
+  exportLogBtn.addEventListener('click', () => {
+    exportBeatLog();
+  });
+
+  clearLogBtn.addEventListener('click', () => {
+    clearBeatLog();
+  });
+}
+
+function logBeat(volume, recentAvg, onset) {
+  const time = isTestMode() ? getTestAudioTime() : performance.now() / 1000;
+  const entry = {
+    time: time.toFixed(3),
+    volume: volume.toFixed(2),
+    recentAvg: recentAvg.toFixed(2),
+    onset: onset.toFixed(2)
+  };
+  state.beatLog.push(entry);
+  state.beatCount++;
+  beatCountEl.textContent = state.beatCount;
+  console.log(`beat @ ${entry.time}s - vol: ${entry.volume}, recent: ${entry.recentAvg}, onset: ${entry.onset}`);
+}
+
+function clearBeatLog() {
+  state.beatLog = [];
+  state.beatCount = 0;
+  state.onsetHistory = [];
+  beatCountEl.textContent = '0';
+  console.log('beat log cleared');
+}
+
+function exportBeatLog() {
+  const header = 'time,volume,recentAvg,onset';
+  const rows = state.beatLog.map(b => `${b.time},${b.volume},${b.recentAvg},${b.onset}`);
+  const csv = [header, ...rows].join('\n');
+
+  console.log('=== BEAT LOG EXPORT ===');
+  console.log(csv);
+  console.log('=======================');
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(csv).then(() => {
+    setStatus(`exported ${state.beatLog.length} beats to clipboard`);
+  }).catch(() => {
+    setStatus('export logged to console');
+  });
 }
 
 // =============================================================================
@@ -89,16 +169,37 @@ function analyzeLoop(currentTime) {
     state.volumeHistory.shift();
   }
 
-  // Beat detection
+  // Onset detection - detect sudden increases in volume
   const timeSinceBeat = currentTime - state.lastBeatTime;
   let beat = false;
 
-  if (volume > avgVolume * getBeatThreshold() &&
+  // Update onset history
+  state.onsetHistory.push(volume);
+  if (state.onsetHistory.length > CONFIG.ONSET_HISTORY) {
+    state.onsetHistory.shift();
+  }
+
+  // Calculate onset: how much volume increased from recent history
+  let recentAvg = 0;
+  if (state.onsetHistory.length > 1) {
+    // Average of all but the current frame
+    const previous = state.onsetHistory.slice(0, -1);
+    recentAvg = previous.reduce((a, b) => a + b, 0) / previous.length;
+  }
+  const onset = volume - recentAvg;
+  const onsetThreshold = CONFIG.ONSET_THRESHOLD_BASE / state.sensitivity;
+
+  if (onset > onsetThreshold &&
       timeSinceBeat > CONFIG.BEAT_COOLDOWN &&
-      avgVolume > getMinVolume()) {
+      volume > getMinVolume()) {
 
     state.lastBeatTime = currentTime;
     beat = true;
+
+    // Log beat for analysis (in test mode)
+    if (isTestMode()) {
+      logBeat(volume, recentAvg, onset);
+    }
 
     // Only auto-open windows when enabled
     if (state.autoOpenEnabled && state.virtualWindows.length < CONFIG.MAX_WINDOWS) {
@@ -155,6 +256,12 @@ async function init() {
 
   // Start audio
   await initAudio();
+
+  // Show test controls if in test mode
+  if (isTestMode()) {
+    testControls.style.display = 'flex';
+    beatLogSection.style.display = 'block';
+  }
 
   // Start title animation
   initTitleAnimation();
