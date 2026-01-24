@@ -171,7 +171,6 @@ function analyzeLoop(currentTime) {
 
   // Onset detection - detect sudden increases in volume
   const timeSinceBeat = currentTime - state.lastBeatTime;
-  let beat = false;
 
   // Update onset history
   state.onsetHistory.push(volume);
@@ -194,7 +193,7 @@ function analyzeLoop(currentTime) {
       volume > getMinVolume()) {
 
     state.lastBeatTime = currentTime;
-    beat = true;
+    state.pendingBeat = true; // Will persist until broadcast
 
     // Log beat for analysis (in test mode)
     if (isTestMode()) {
@@ -226,7 +225,8 @@ function analyzeLoop(currentTime) {
   // Broadcast audio to iframes (throttled to 30fps)
   if (currentTime - state.lastBroadcastTime >= CONFIG.BROADCAST_INTERVAL) {
     state.lastBroadcastTime = currentTime;
-    broadcastAudioData(volume, beat);
+    broadcastAudioData(volume, state.pendingBeat);
+    state.pendingBeat = false; // Reset after broadcast
   }
 
   // Update UI

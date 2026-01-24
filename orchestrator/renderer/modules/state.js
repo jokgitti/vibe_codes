@@ -48,5 +48,8 @@ export const state = {
   beatCount: 0,
 
   // Onset detection history
-  onsetHistory: []
+  onsetHistory: [],
+
+  // Pending beat flag (persists until broadcast)
+  pendingBeat: false
 };

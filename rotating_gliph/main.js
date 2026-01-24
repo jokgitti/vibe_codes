@@ -28,7 +28,7 @@ scene.add(dodecahedron);
 const currentRotation = { x: 0, y: 0, z: 0 };
 const targetRotation = { x: 0, y: 0, z: 0 };
 let animationProgress = 1; // 1 = animation complete
-const animationDuration = 500; // ms
+const animationDuration = 250; // ms
 let animationStartTime = 0;
 const startRotation = { x: 0, y: 0, z: 0 };
 
