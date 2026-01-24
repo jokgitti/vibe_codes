@@ -17,31 +17,25 @@ body {
   height: 100vh;
 }
 
-/* Control Panel Sidebar */
-.control-panel {
+/* Control Panel Window */
+.control-panel-window {
+  position: absolute;
+  top: 20px;
+  left: 20px;
   width: 200px;
+  z-index: 1000000000;
+}
+
+.control-panel-window.hidden {
+  display: none;
+}
+
+.control-panel-content.win98-content {
   background: #c0c0c0;
-  border-right: 2px solid #808080;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 15px;
-  transition: margin-left 0.2s ease-out;
-}
-
-.control-panel.hidden {
-  margin-left: -200px;
-}
-
-.control-panel h1 {
-  font-size: 12px;
-  text-align: center;
-  letter-spacing: 2px;
-  color: #000;
-  padding: 5px;
-  background: linear-gradient(to right, #000080, #1084d0);
-  color: white;
-  font-weight: bold;
 }
 
 .stats {

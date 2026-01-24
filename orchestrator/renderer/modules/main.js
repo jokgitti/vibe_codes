@@ -9,14 +9,15 @@ import { initUI, updateUI, setStatus } from './ui.js';
 import { initTitleElements, initTitleAnimation } from './title.js';
 import { initWindowContainer, recalculateGrid, createVirtualWindow, closeOldestWindow, closeVirtualWindow } from './windows.js';
 import { initModal } from './modal.js';
-import { initKeyboard } from './keyboard.js';
-import { initDrag } from './drag.js';
+import { initKeyboard, hideControlPanel } from './keyboard.js';
+import { initDrag, makeDraggable } from './drag.js';
 
 // =============================================================================
 // DOM ELEMENTS (for event handlers)
 // =============================================================================
 
 let openBtn, closeBtn, sensitivitySlider, sensitivityValue, patternSelect;
+let controlPanelWindow, controlPanelTitlebar, controlPanelClose;
 
 function initDOMElements() {
   openBtn = document.getElementById('openBtn');
@@ -24,6 +25,19 @@ function initDOMElements() {
   sensitivitySlider = document.getElementById('sensitivitySlider');
   sensitivityValue = document.getElementById('sensitivityValue');
   patternSelect = document.getElementById('patternSelect');
+  controlPanelWindow = document.getElementById('controlPanelWindow');
+  controlPanelTitlebar = document.getElementById('controlPanelTitlebar');
+  controlPanelClose = document.getElementById('controlPanelClose');
+}
+
+function initControlPanel() {
+  // Make control panel draggable
+  makeDraggable(controlPanelWindow, controlPanelTitlebar);
+
+  // Close button hides the panel
+  controlPanelClose.addEventListener('click', () => {
+    hideControlPanel();
+  });
 }
 
 // =============================================================================
@@ -133,6 +147,7 @@ async function init() {
   initDrag();
   initModal();
   initKeyboard();
+  initControlPanel();
   initEventHandlers();
 
   // Calculate initial grid

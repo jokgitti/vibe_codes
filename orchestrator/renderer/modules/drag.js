@@ -42,9 +42,11 @@ function startDrag(windowEl, mouseX, mouseY) {
   windowEl.style.left = `${rect.left}px`;
   windowEl.style.top = `${rect.top}px`;
 
-  // Bring to front
-  state.currentZIndex++;
-  windowEl.style.zIndex = state.currentZIndex;
+  // Bring to front (but not for control panel - it's always on top)
+  if (!windowEl.classList.contains('control-panel-window')) {
+    state.currentZIndex++;
+    windowEl.style.zIndex = state.currentZIndex;
+  }
 
   // Disable pointer events on all iframes during drag
   document.querySelectorAll('iframe').forEach(iframe => {

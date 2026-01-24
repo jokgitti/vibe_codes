@@ -8,13 +8,21 @@ import { initTitleAnimation, stopTitleAnimation } from './title.js';
 import { showProjectModal, hideProjectModal, confirmProjectSelection, modalVisible } from './modal.js';
 import { closeAllWindows } from './windows.js';
 
-let controlPanel, titleOverlay;
+let controlPanelWindow, titleOverlay;
 
 export function initKeyboard() {
-  controlPanel = document.querySelector('.control-panel');
+  controlPanelWindow = document.getElementById('controlPanelWindow');
   titleOverlay = document.getElementById('titleOverlay');
 
   window.addEventListener('keydown', handleKeydown);
+}
+
+export function showControlPanel() {
+  controlPanelWindow.classList.remove('hidden');
+}
+
+export function hideControlPanel() {
+  controlPanelWindow.classList.add('hidden');
 }
 
 function handleKeydown(e) {
@@ -48,7 +56,7 @@ function handleKeydown(e) {
   // Cmd+I (or Ctrl+I): Toggle control panel
   if ((e.metaKey || e.ctrlKey) && key === 'i') {
     e.preventDefault();
-    controlPanel.classList.toggle('hidden');
+    controlPanelWindow.classList.toggle('hidden');
     return;
   }
 
