@@ -16,11 +16,20 @@ export function initDrag() {
   document.addEventListener('mouseup', handleMouseUp);
 }
 
+// Bring window to front without starting a drag
+export function bringToFront(windowEl) {
+  if (windowEl.classList.contains('control-panel-window')) return;
+  if (windowEl.classList.contains('audio-controller-window')) return;
+
+  state.currentZIndex++;
+  windowEl.style.zIndex = state.currentZIndex;
+}
+
 // Call this when creating a draggable window
 export function makeDraggable(windowEl, titleBarEl) {
   titleBarEl.addEventListener('mousedown', (e) => {
-    // Don't drag if clicking close button
-    if (e.target.closest('.win98-btn-close')) return;
+    // Don't drag if clicking title bar buttons
+    if (e.target.closest('.win98-btn')) return;
 
     e.preventDefault();
     startDrag(windowEl, e.clientX, e.clientY);
@@ -35,12 +44,6 @@ function startDrag(windowEl, mouseX, mouseY) {
   const rect = windowEl.getBoundingClientRect();
   dragOffsetX = mouseX - rect.left;
   dragOffsetY = mouseY - rect.top;
-
-  // Clear any transform (used for initial centering)
-  // and set position based on current rendered location
-  windowEl.style.transform = '';
-  windowEl.style.left = `${rect.left}px`;
-  windowEl.style.top = `${rect.top}px`;
 
   // Bring to front (but not for control panel - it's always on top)
   if (!windowEl.classList.contains('control-panel-window')) {

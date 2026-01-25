@@ -5,7 +5,7 @@
 import { CONFIG, PROJECTS } from './config.js';
 import { state } from './state.js';
 import { updateUI, setStatus } from './ui.js';
-import { makeDraggable } from './drag.js';
+import { makeDraggable, bringToFront } from './drag.js';
 
 let windowContainer;
 
@@ -251,11 +251,18 @@ export function createVirtualWindowWithProject(project) {
   const buttons = document.createElement('div');
   buttons.className = 'win98-buttons';
 
+  const maximizeButton = document.createElement('button');
+  maximizeButton.className = 'win98-btn win98-btn-maximize';
+  maximizeButton.onclick = (e) => {
+    e.stopPropagation();
+    toggleMaximize(id);
+  };
+
   const closeButton = document.createElement('button');
   closeButton.className = 'win98-btn win98-btn-close';
-  closeButton.textContent = '×';
   closeButton.onclick = () => closeVirtualWindow(id);
 
+  buttons.appendChild(maximizeButton);
   buttons.appendChild(closeButton);
   titleBar.appendChild(title);
   titleBar.appendChild(buttons);
@@ -275,6 +282,9 @@ export function createVirtualWindowWithProject(project) {
 
   // Make window draggable by title bar
   makeDraggable(windowEl, titleBar);
+
+  // Bring to front when clicking anywhere on window
+  windowEl.addEventListener('mousedown', () => bringToFront(windowEl));
 
   // Track window
   const win = { id, element: windowEl, iframe, project, gridIndex };
@@ -331,4 +341,44 @@ export function closeAllWindows() {
     state.virtualWindows.pop();
   }
   updateUI();
+}
+
+// =============================================================================
+// WINDOW MAXIMIZE
+// =============================================================================
+
+export function toggleMaximize(id) {
+  const win = state.virtualWindows.find(w => w.id === id);
+  if (!win) return;
+
+  const windowEl = win.element;
+
+  if (win.isMaximized) {
+    // Restore to previous position and size
+    windowEl.classList.remove('maximized');
+    windowEl.style.left = `${win.prevPosition.x}px`;
+    windowEl.style.top = `${win.prevPosition.y}px`;
+    windowEl.style.width = `${win.prevPosition.width}px`;
+    windowEl.style.height = `${win.prevPosition.height}px`;
+    win.isMaximized = false;
+  } else {
+    // Save current position and size
+    win.prevPosition = {
+      x: parseInt(windowEl.style.left),
+      y: parseInt(windowEl.style.top),
+      width: parseInt(windowEl.style.width),
+      height: parseInt(windowEl.style.height)
+    };
+
+    // Maximize to fill window container
+    windowEl.classList.add('maximized');
+    windowEl.style.left = '0px';
+    windowEl.style.top = '0px';
+    windowEl.style.width = `${windowContainer.clientWidth}px`;
+    windowEl.style.height = `${windowContainer.clientHeight}px`;
+    win.isMaximized = true;
+
+    // Bring to front
+    bringToFront(windowEl);
+  }
 }

@@ -17,9 +17,9 @@ import { initDrag, makeDraggable } from './drag.js';
 // DOM ELEMENTS (for event handlers)
 // =============================================================================
 
-let openBtn, closeBtn, sensitivitySlider, sensitivityValue, patternSelect;
+let sensitivitySlider, sensitivityValue, patternSelect;
 let controlPanelWindow, controlPanelTitlebar, controlPanelClose;
-let beatCountEl;
+let bpmValueEl;
 
 // File picker modal
 let filePickerOverlay, filePickerModal, filePickerTitlebar, filePickerClose;
@@ -31,15 +31,13 @@ let audioTrackName, audioArtistAlbum, audioProgress, audioTimeDisplay;
 let audioPlayPauseBtn, audioStopBtn, audioBackBtn, audioForwardBtn, audioRepeatBtn;
 
 function initDOMElements() {
-  openBtn = document.getElementById('openBtn');
-  closeBtn = document.getElementById('closeBtn');
   sensitivitySlider = document.getElementById('sensitivitySlider');
   sensitivityValue = document.getElementById('sensitivityValue');
   patternSelect = document.getElementById('patternSelect');
   controlPanelWindow = document.getElementById('controlPanelWindow');
   controlPanelTitlebar = document.getElementById('controlPanelTitlebar');
   controlPanelClose = document.getElementById('controlPanelClose');
-  beatCountEl = document.getElementById('beatCount');
+  bpmValueEl = document.getElementById('bpmValue');
 
   // File picker modal
   filePickerOverlay = document.getElementById('filePickerOverlay');
@@ -145,8 +143,20 @@ async function handleFileSelection(file) {
 // AUDIO CONTROLLER
 // =============================================================================
 
+let audioControllerPositioned = false;
+
 function showAudioController() {
   audioControllerWindow.classList.remove('hidden');
+
+  // Position at bottom center on first show
+  if (!audioControllerPositioned) {
+    const windowWidth = 350;
+    const left = (window.innerWidth - windowWidth) / 2;
+    const top = window.innerHeight - audioControllerWindow.offsetHeight - 40;
+    audioControllerWindow.style.left = `${left}px`;
+    audioControllerWindow.style.top = `${top}px`;
+    audioControllerPositioned = true;
+  }
 }
 
 function hideAudioController() {
@@ -178,7 +188,7 @@ function initAudioController() {
   audioStopBtn.addEventListener('click', () => {
     stopAudio();
     updatePlayPauseButton();
-    resetBeatCount();
+    resetBPM();
   });
 
   // Back 10s button
@@ -215,7 +225,7 @@ function initAudioController() {
     },
     onAudioLoaded: ({ name, duration, metadata }) => {
       // Reset beat count on new file
-      resetBeatCount();
+      resetBPM();
 
       // Display track name (from metadata or filename)
       const trackName = metadata?.title || name.replace(/\.[^/.]+$/, '');
@@ -233,7 +243,7 @@ function initAudioController() {
       updatePlayPauseButton();
     },
     onAudioUnloaded: () => {
-      resetBeatCount();
+      resetBPM();
       audioTrackName.textContent = 'no file loaded';
       audioArtistAlbum.textContent = '';
       updateProgressDisplay(0, 0);
@@ -267,16 +277,6 @@ function formatTime(seconds) {
 // =============================================================================
 
 function initEventHandlers() {
-  openBtn.addEventListener('click', () => {
-    createVirtualWindow();
-  });
-
-  closeBtn.addEventListener('click', () => {
-    if (state.virtualWindows.length > 0) {
-      closeVirtualWindow(state.virtualWindows[state.virtualWindows.length - 1].id);
-    }
-  });
-
   sensitivitySlider.addEventListener('input', (e) => {
     state.sensitivity = parseFloat(e.target.value);
     sensitivityValue.textContent = state.sensitivity.toFixed(1) + 'x';
@@ -292,17 +292,59 @@ function initEventHandlers() {
   });
 }
 
-function incrementBeatCount() {
-  state.beatCount++;
-  if (beatCountEl) {
-    beatCountEl.textContent = state.beatCount;
+let bpmResetTimeout = null;
+
+function recordBeat() {
+  const now = performance.now();
+  state.beatTimestamps.push(now);
+  // Trim to history size
+  if (state.beatTimestamps.length > CONFIG.BPM_HISTORY_SIZE) {
+    state.beatTimestamps.shift();
   }
+  updateBPMDisplay();
+
+  // Reset BPM after 3 seconds of no beats
+  if (bpmResetTimeout) {
+    clearTimeout(bpmResetTimeout);
+  }
+  bpmResetTimeout = setTimeout(resetBPM, 3000);
 }
 
-function resetBeatCount() {
-  state.beatCount = 0;
-  if (beatCountEl) {
-    beatCountEl.textContent = '0';
+function calculateBPM() {
+  if (state.beatTimestamps.length < 2) {
+    return null;
+  }
+
+  // Calculate intervals between consecutive beats
+  const intervals = [];
+  for (let i = 1; i < state.beatTimestamps.length; i++) {
+    const interval = state.beatTimestamps[i] - state.beatTimestamps[i - 1];
+    // Only include intervals within max interval (ignore pauses)
+    if (interval <= CONFIG.BPM_MAX_INTERVAL) {
+      intervals.push(interval);
+    }
+  }
+
+  if (intervals.length === 0) {
+    return null;
+  }
+
+  // Average interval in ms
+  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  // Convert to BPM: 60000ms / interval
+  return Math.round(60000 / avgInterval);
+}
+
+function updateBPMDisplay() {
+  if (!bpmValueEl) return;
+  const bpm = calculateBPM();
+  bpmValueEl.textContent = bpm !== null ? bpm : '--';
+}
+
+function resetBPM() {
+  state.beatTimestamps = [];
+  if (bpmValueEl) {
+    bpmValueEl.textContent = '--';
   }
 }
 
@@ -350,7 +392,7 @@ function analyzeLoop(currentTime) {
 
     state.lastBeatTime = currentTime;
     state.pendingBeat = true; // Will persist until broadcast
-    incrementBeatCount();
+    recordBeat();
 
     // Only auto-open windows when enabled
     if (state.autoOpenEnabled && state.virtualWindows.length < CONFIG.MAX_WINDOWS) {

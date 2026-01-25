@@ -126,8 +126,9 @@ orchestrator/
 ├── preload.js        # Minimal IPC bridge
 ├── renderer/
 │   ├── index.html    # Control panel + window container
-│   ├── renderer.js   # Audio analysis, beat detection, virtual windows
-│   └── styles.css    # Windows 98 style chrome
+│   ├── styles.css    # Windows 98 style chrome
+│   ├── assets/       # SVG icons (close.svg, maximize.svg)
+│   └── modules/      # JS modules (main, windows, drag, audio, etc.)
 ├── package.json
 └── CLAUDE.md         # This file
 ```
@@ -153,15 +154,15 @@ The orchestrator randomly selects from:
 
 - **Windows bar**: Shows current/max windows
 - **Audio bar**: Shows current audio level
+- **BPM display**: Shows calculated tempo from detected beats (averages last 8 beats)
 - **Sensitivity slider**: Adjust beat detection sensitivity
 - **Pattern dropdown**: Select window positioning pattern
-- **Open button**: Manually open a random project window
-- **Close button**: Manually close the newest window
 
 ## Windows 98 Style
 
 Virtual windows have Windows 98 style chrome:
 - Blue gradient title bar (#000080 to #1084d0)
 - 3D beveled borders (outset/inset)
-- Close button in title bar
+- Title bar buttons with SVG icons (maximize, close)
+- Maximize button to toggle fullscreen (fills main window)
 - Teal desktop background (#008080)
