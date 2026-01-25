@@ -43,8 +43,7 @@ export const state = {
   // Z-index management for dragging
   currentZIndex: 1,
 
-  // Beat logging for analysis
-  beatLog: [],
+  // Beat count
   beatCount: 0,
 
   // Onset detection history

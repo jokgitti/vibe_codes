@@ -4,7 +4,8 @@
 
 import { CONFIG } from './config.js';
 import { state } from './state.js';
-import { initAudio, getVolume, getAverageVolume, getBeatThreshold, getMinVolume, broadcastAudioData, playTestAudio, pauseTestAudio, seekTestAudio, isTestMode, getTestAudioTime } from './audio.js';
+import { initAudio, getVolume, getAverageVolume, getBeatThreshold, getMinVolume, broadcastAudioData } from './audio.js';
+import { setPlaybackCallbacks, loadAudioFile, unloadAudioFile, playAudio, pauseAudio, stopAudio, seekRelative, setRepeat, isRepeatEnabled, isAudioFileLoaded, isAudioPlaying, getAudioTime, getAudioDuration } from './playback.js';
 import { initUI, updateUI, setStatus } from './ui.js';
 import { initTitleElements, initTitleAnimation } from './title.js';
 import { initWindowContainer, recalculateGrid, createVirtualWindow, closeOldestWindow, closeVirtualWindow } from './windows.js';
@@ -18,9 +19,16 @@ import { initDrag, makeDraggable } from './drag.js';
 
 let openBtn, closeBtn, sensitivitySlider, sensitivityValue, patternSelect;
 let controlPanelWindow, controlPanelTitlebar, controlPanelClose;
-let testControls, playBtn, restartBtn;
-let beatLogSection, beatCountEl, exportLogBtn, clearLogBtn;
-let isPlaying = false;
+let beatCountEl;
+
+// File picker modal
+let filePickerOverlay, filePickerModal, filePickerTitlebar, filePickerClose;
+let fileInput, dropZone, filePickerCancelBtn;
+
+// Audio controller window
+let audioControllerWindow, audioControllerTitlebar, audioControllerClose;
+let audioTrackName, audioArtistAlbum, audioProgress, audioTimeDisplay;
+let audioPlayPauseBtn, audioStopBtn, audioBackBtn, audioForwardBtn, audioRepeatBtn;
 
 function initDOMElements() {
   openBtn = document.getElementById('openBtn');
@@ -31,13 +39,30 @@ function initDOMElements() {
   controlPanelWindow = document.getElementById('controlPanelWindow');
   controlPanelTitlebar = document.getElementById('controlPanelTitlebar');
   controlPanelClose = document.getElementById('controlPanelClose');
-  testControls = document.getElementById('testControls');
-  playBtn = document.getElementById('playBtn');
-  restartBtn = document.getElementById('restartBtn');
-  beatLogSection = document.getElementById('beatLogSection');
   beatCountEl = document.getElementById('beatCount');
-  exportLogBtn = document.getElementById('exportLogBtn');
-  clearLogBtn = document.getElementById('clearLogBtn');
+
+  // File picker modal
+  filePickerOverlay = document.getElementById('filePickerOverlay');
+  filePickerModal = document.getElementById('filePickerModal');
+  filePickerTitlebar = document.getElementById('filePickerTitlebar');
+  filePickerClose = document.getElementById('filePickerClose');
+  fileInput = document.getElementById('fileInput');
+  dropZone = document.getElementById('dropZone');
+  filePickerCancelBtn = document.getElementById('filePickerCancelBtn');
+
+  // Audio controller window
+  audioControllerWindow = document.getElementById('audioControllerWindow');
+  audioControllerTitlebar = document.getElementById('audioControllerTitlebar');
+  audioControllerClose = document.getElementById('audioControllerClose');
+  audioTrackName = document.getElementById('audioTrackName');
+  audioArtistAlbum = document.getElementById('audioArtistAlbum');
+  audioProgress = document.getElementById('audioProgress');
+  audioTimeDisplay = document.getElementById('audioTimeDisplay');
+  audioPlayPauseBtn = document.getElementById('audioPlayPauseBtn');
+  audioStopBtn = document.getElementById('audioStopBtn');
+  audioBackBtn = document.getElementById('audioBackBtn');
+  audioForwardBtn = document.getElementById('audioForwardBtn');
+  audioRepeatBtn = document.getElementById('audioRepeatBtn');
 }
 
 function initControlPanel() {
@@ -48,6 +73,193 @@ function initControlPanel() {
   controlPanelClose.addEventListener('click', () => {
     hideControlPanel();
   });
+}
+
+// =============================================================================
+// FILE PICKER
+// =============================================================================
+
+export function showFilePicker() {
+  filePickerOverlay.classList.add('visible');
+}
+
+export function hideFilePicker() {
+  filePickerOverlay.classList.remove('visible');
+  fileInput.value = '';
+}
+
+function initFilePicker() {
+  // Make file picker modal draggable
+  makeDraggable(filePickerModal, filePickerTitlebar);
+
+  // Close button
+  filePickerClose.addEventListener('click', hideFilePicker);
+  filePickerCancelBtn.addEventListener('click', hideFilePicker);
+
+  // File input change
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      await handleFileSelection(file);
+    }
+  });
+
+  // Drag and drop
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+  });
+
+  dropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.match(/\.(mp3|wav|flac)$/i)) {
+      await handleFileSelection(file);
+    } else {
+      setStatus('please drop an mp3, wav, or flac file');
+    }
+  });
+
+  // Click on drop zone triggers file input
+  dropZone.addEventListener('click', () => {
+    fileInput.click();
+  });
+}
+
+async function handleFileSelection(file) {
+  hideFilePicker();
+  const success = await loadAudioFile(file);
+  if (success) {
+    showAudioController();
+    playAudio();
+    updatePlayPauseButton();
+  }
+}
+
+// =============================================================================
+// AUDIO CONTROLLER
+// =============================================================================
+
+function showAudioController() {
+  audioControllerWindow.classList.remove('hidden');
+}
+
+function hideAudioController() {
+  audioControllerWindow.classList.add('hidden');
+}
+
+function initAudioController() {
+  // Make audio controller draggable
+  makeDraggable(audioControllerWindow, audioControllerTitlebar);
+
+  // Close button - unloads audio and hides controller
+  audioControllerClose.addEventListener('click', () => {
+    unloadAudioFile();
+    hideAudioController();
+    setStatus('audio unloaded');
+  });
+
+  // Play/Pause button
+  audioPlayPauseBtn.addEventListener('click', () => {
+    if (isAudioPlaying()) {
+      pauseAudio();
+    } else {
+      playAudio();
+    }
+    updatePlayPauseButton();
+  });
+
+  // Stop button
+  audioStopBtn.addEventListener('click', () => {
+    stopAudio();
+    updatePlayPauseButton();
+    resetBeatCount();
+  });
+
+  // Back 10s button
+  audioBackBtn.addEventListener('click', () => {
+    seekRelative(-10);
+  });
+
+  // Forward 10s button
+  audioForwardBtn.addEventListener('click', () => {
+    seekRelative(10);
+  });
+
+  // Repeat button
+  audioRepeatBtn.addEventListener('click', () => {
+    setRepeat(!isRepeatEnabled());
+    updateRepeatButton();
+  });
+
+  // Progress bar click to seek
+  audioProgress.parentElement.addEventListener('click', (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+    const duration = getAudioDuration();
+    if (duration > 0) {
+      const time = percent * duration;
+      seekRelative(time - getAudioTime());
+    }
+  });
+
+  // Set up playback callbacks
+  setPlaybackCallbacks({
+    onTimeUpdate: ({ currentTime, duration }) => {
+      updateProgressDisplay(currentTime, duration);
+    },
+    onAudioLoaded: ({ name, duration, metadata }) => {
+      // Reset beat count on new file
+      resetBeatCount();
+
+      // Display track name (from metadata or filename)
+      const trackName = metadata?.title || name.replace(/\.[^/.]+$/, '');
+      audioTrackName.textContent = trackName;
+
+      // Display artist and album if available
+      const parts = [];
+      if (metadata?.artist) parts.push(metadata.artist);
+      if (metadata?.album) parts.push(metadata.album);
+      audioArtistAlbum.textContent = parts.join(' - ');
+
+      updateProgressDisplay(0, duration);
+    },
+    onAudioEnded: () => {
+      updatePlayPauseButton();
+    },
+    onAudioUnloaded: () => {
+      resetBeatCount();
+      audioTrackName.textContent = 'no file loaded';
+      audioArtistAlbum.textContent = '';
+      updateProgressDisplay(0, 0);
+    }
+  });
+}
+
+function updatePlayPauseButton() {
+  audioPlayPauseBtn.textContent = isAudioPlaying() ? '||' : '>';
+}
+
+function updateRepeatButton() {
+  audioRepeatBtn.classList.toggle('active', isRepeatEnabled());
+}
+
+function updateProgressDisplay(currentTime, duration) {
+  const percent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  audioProgress.style.width = `${percent}%`;
+  audioTimeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+}
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 // =============================================================================
@@ -78,76 +290,20 @@ function initEventHandlers() {
   window.addEventListener('resize', () => {
     recalculateGrid();
   });
-
-  // Test audio controls
-  playBtn.addEventListener('click', () => {
-    if (isPlaying) {
-      pauseTestAudio();
-      playBtn.textContent = 'play';
-      isPlaying = false;
-    } else {
-      playTestAudio();
-      playBtn.textContent = 'pause';
-      isPlaying = true;
-    }
-  });
-
-  restartBtn.addEventListener('click', () => {
-    seekTestAudio(0);
-    clearBeatLog();
-    if (!isPlaying) {
-      playTestAudio();
-      playBtn.textContent = 'pause';
-      isPlaying = true;
-    }
-  });
-
-  exportLogBtn.addEventListener('click', () => {
-    exportBeatLog();
-  });
-
-  clearLogBtn.addEventListener('click', () => {
-    clearBeatLog();
-  });
 }
 
-function logBeat(volume, recentAvg, onset) {
-  const time = isTestMode() ? getTestAudioTime() : performance.now() / 1000;
-  const entry = {
-    time: time.toFixed(3),
-    volume: volume.toFixed(2),
-    recentAvg: recentAvg.toFixed(2),
-    onset: onset.toFixed(2)
-  };
-  state.beatLog.push(entry);
+function incrementBeatCount() {
   state.beatCount++;
-  beatCountEl.textContent = state.beatCount;
-  console.log(`beat @ ${entry.time}s - vol: ${entry.volume}, recent: ${entry.recentAvg}, onset: ${entry.onset}`);
+  if (beatCountEl) {
+    beatCountEl.textContent = state.beatCount;
+  }
 }
 
-function clearBeatLog() {
-  state.beatLog = [];
+function resetBeatCount() {
   state.beatCount = 0;
-  state.onsetHistory = [];
-  beatCountEl.textContent = '0';
-  console.log('beat log cleared');
-}
-
-function exportBeatLog() {
-  const header = 'time,volume,recentAvg,onset';
-  const rows = state.beatLog.map(b => `${b.time},${b.volume},${b.recentAvg},${b.onset}`);
-  const csv = [header, ...rows].join('\n');
-
-  console.log('=== BEAT LOG EXPORT ===');
-  console.log(csv);
-  console.log('=======================');
-
-  // Copy to clipboard
-  navigator.clipboard.writeText(csv).then(() => {
-    setStatus(`exported ${state.beatLog.length} beats to clipboard`);
-  }).catch(() => {
-    setStatus('export logged to console');
-  });
+  if (beatCountEl) {
+    beatCountEl.textContent = '0';
+  }
 }
 
 // =============================================================================
@@ -194,11 +350,7 @@ function analyzeLoop(currentTime) {
 
     state.lastBeatTime = currentTime;
     state.pendingBeat = true; // Will persist until broadcast
-
-    // Log beat for analysis (in test mode)
-    if (isTestMode()) {
-      logBeat(volume, recentAvg, onset);
-    }
+    incrementBeatCount();
 
     // Only auto-open windows when enabled
     if (state.autoOpenEnabled && state.virtualWindows.length < CONFIG.MAX_WINDOWS) {
@@ -249,6 +401,8 @@ async function init() {
   initModal();
   initKeyboard();
   initControlPanel();
+  initFilePicker();
+  initAudioController();
   initEventHandlers();
 
   // Calculate initial grid
@@ -256,12 +410,6 @@ async function init() {
 
   // Start audio
   await initAudio();
-
-  // Show test controls if in test mode
-  if (isTestMode()) {
-    testControls.style.display = 'flex';
-    beatLogSection.style.display = 'block';
-  }
 
   // Start title animation
   initTitleAnimation();

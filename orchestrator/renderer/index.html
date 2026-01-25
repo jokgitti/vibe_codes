@@ -59,19 +59,10 @@
           <button id="closeBtn">close</button>
         </div>
 
-        <div class="controls test-controls" id="testControls" style="display: none;">
-          <button id="playBtn">play</button>
-          <button id="restartBtn">restart</button>
-        </div>
-
-        <div class="beat-log" id="beatLogSection" style="display: none;">
+        <div class="beat-log" id="beatLogSection">
           <div class="stat-row">
             <span class="label">beats detected</span>
             <span class="count" id="beatCount">0</span>
-          </div>
-          <div class="controls">
-            <button id="exportLogBtn">export log</button>
-            <button id="clearLogBtn">clear</button>
           </div>
         </div>
       </div>
@@ -98,6 +89,55 @@
         <div class="modal-buttons">
           <button id="modalOpenBtn">open</button>
           <button id="modalCancelBtn">cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- File Picker Modal -->
+    <div class="modal-overlay" id="filePickerOverlay">
+      <div class="modal" id="filePickerModal">
+        <div class="win98-titlebar" id="filePickerTitlebar">
+          <span class="win98-title">open audio file</span>
+          <div class="win98-buttons">
+            <button class="win98-btn win98-btn-close" id="filePickerClose">×</button>
+          </div>
+        </div>
+        <div class="modal-content">
+          <div class="drop-zone" id="dropZone">
+            <p>drag & drop audio file here</p>
+            <p class="drop-zone-hint">or click to browse</p>
+          </div>
+          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac" hidden>
+        </div>
+        <div class="modal-buttons">
+          <button id="filePickerCancelBtn">cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audio Controller Window -->
+    <div class="win98-window audio-controller-window hidden" id="audioControllerWindow">
+      <div class="win98-titlebar" id="audioControllerTitlebar">
+        <span class="win98-title">music_player</span>
+        <div class="win98-buttons">
+          <button class="win98-btn win98-btn-close" id="audioControllerClose">×</button>
+        </div>
+      </div>
+      <div class="win98-content audio-controller-content">
+        <div class="audio-info" id="audioInfo">
+          <div class="audio-track" id="audioTrackName">no file loaded</div>
+          <div class="audio-artist" id="audioArtistAlbum"></div>
+        </div>
+        <div class="audio-progress-container" id="audioProgressContainer">
+          <div class="audio-progress" id="audioProgress"></div>
+        </div>
+        <div class="audio-time" id="audioTimeDisplay">0:00 / 0:00</div>
+        <div class="audio-controls">
+          <button class="audio-btn" id="audioBackBtn">|&lt;</button>
+          <button class="audio-btn" id="audioPlayPauseBtn">&gt;</button>
+          <button class="audio-btn" id="audioStopBtn">[ ]</button>
+          <button class="audio-btn" id="audioForwardBtn">&gt;|</button>
+          <button class="audio-btn" id="audioRepeatBtn">[R]</button>
         </div>
       </div>
     </div>

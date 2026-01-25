@@ -7,14 +7,20 @@ import { setStatus } from './ui.js';
 import { initTitleAnimation, stopTitleAnimation } from './title.js';
 import { showProjectModal, hideProjectModal, confirmProjectSelection, modalVisible } from './modal.js';
 import { closeAllWindows } from './windows.js';
+import { showFilePicker, hideFilePicker } from './main.js';
 
-let controlPanelWindow, titleOverlay;
+let controlPanelWindow, titleOverlay, filePickerOverlay;
 
 export function initKeyboard() {
   controlPanelWindow = document.getElementById('controlPanelWindow');
   titleOverlay = document.getElementById('titleOverlay');
+  filePickerOverlay = document.getElementById('filePickerOverlay');
 
   window.addEventListener('keydown', handleKeydown);
+}
+
+export function isFilePickerVisible() {
+  return filePickerOverlay && filePickerOverlay.classList.contains('visible');
 }
 
 export function showControlPanel() {
@@ -27,6 +33,17 @@ export function hideControlPanel() {
 
 function handleKeydown(e) {
   const key = e.key.toLowerCase();
+
+  // Handle file picker keyboard input
+  if (isFilePickerVisible()) {
+    // Escape: Close file picker
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      hideFilePicker();
+      return;
+    }
+    return;
+  }
 
   // Handle modal keyboard input
   if (modalVisible) {
@@ -43,6 +60,13 @@ function handleKeydown(e) {
       confirmProjectSelection();
       return;
     }
+    return;
+  }
+
+  // Cmd+O (or Ctrl+O): Open file picker
+  if ((e.metaKey || e.ctrlKey) && key === 'o') {
+    e.preventDefault();
+    showFilePicker();
     return;
   }
 
