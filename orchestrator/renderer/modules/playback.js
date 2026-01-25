@@ -185,6 +185,11 @@ export async function loadAudioFile(file) {
       audioElement.addEventListener('error', () => reject(new Error('failed to load audio file')), { once: true });
     });
 
+    // Disconnect mic from analyser during file playback (prevents mic feeding to speakers)
+    if (state.micSource) {
+      state.micSource.disconnect();
+    }
+
     // Connect to analyser
     audioSource = state.audioContext.createMediaElementSource(audioElement);
     audioSource.connect(state.analyser);
@@ -233,6 +238,11 @@ export function unloadAudioFile() {
     } catch (e) {
       // May not be connected
     }
+  }
+
+  // Reconnect mic to analyser for mic-based analysis
+  if (state.micSource && state.analyser) {
+    state.micSource.connect(state.analyser);
   }
 
   audioFileLoaded = false;

@@ -15,8 +15,8 @@ export async function initAudio() {
 
     // Microphone capture
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const source = state.audioContext.createMediaStreamSource(stream);
-    source.connect(state.analyser);
+    state.micSource = state.audioContext.createMediaStreamSource(stream);
+    state.micSource.connect(state.analyser);
 
     state.frequencyData = new Uint8Array(state.analyser.frequencyBinCount);
     state.timeDomainData = new Uint8Array(state.analyser.fftSize);

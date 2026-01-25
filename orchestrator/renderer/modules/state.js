@@ -13,6 +13,7 @@ export const state = {
   // Audio
   audioContext: null,
   analyser: null,
+  micSource: null,
   frequencyData: null,
   timeDomainData: null,
   audioEnabled: false,
@@ -43,8 +44,8 @@ export const state = {
   // Z-index management for dragging
   currentZIndex: 1,
 
-  // Beat count
-  beatCount: 0,
+  // BPM calculation (stores recent beat timestamps)
+  beatTimestamps: [],
 
   // Onset detection history
   onsetHistory: [],

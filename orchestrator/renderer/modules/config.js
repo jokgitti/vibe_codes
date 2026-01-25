@@ -36,7 +36,11 @@ export const CONFIG = {
   MIN_WINDOWS_TO_CLOSE: 3,
 
   // Audio broadcast (30fps = 33ms interval)
-  BROADCAST_INTERVAL: 33
+  BROADCAST_INTERVAL: 33,
+
+  // BPM calculation
+  BPM_HISTORY_SIZE: 8,      // Number of beats to average
+  BPM_MAX_INTERVAL: 2000    // Ignore gaps > 2 seconds as "pauses"
 };
 
 // Available projects
