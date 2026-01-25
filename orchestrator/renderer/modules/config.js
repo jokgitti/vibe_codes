@@ -2,10 +2,6 @@
 // CONFIGURATION
 // =============================================================================
 
-// Test audio file for beat detection experiments
-// Set to null to use microphone input
-export const TEST_AUDIO_FILE = '/Users/lucagaleazzi/Library/Mobile Documents/com~apple~CloudDocs/Documents/Music/Ninajirachi - I Love My Computer/Ninajirachi - I Love My Computer - 08 Infohazard.wav';
-
 export const CONFIG = {
   // Window sizing
   WINDOW_WIDTH: 400,

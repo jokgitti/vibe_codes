@@ -369,6 +369,9 @@ button:active {
 /* Modal Window (draggable) */
 .modal {
   position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: #c0c0c0;
   border: 2px outset #dfdfdf;
   box-shadow: 4px 4px 0 #000;
@@ -404,7 +407,7 @@ button:active {
 
 .modal-buttons {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
   padding: 10px 15px;
   border-top: 1px solid #808080;
@@ -412,4 +415,120 @@ button:active {
 
 .modal-buttons button {
   min-width: 70px;
+  flex: 0;
+}
+
+/* File Picker Modal */
+.drop-zone {
+  border: 2px dashed #808080;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  background: #fff;
+  margin-bottom: 10px;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+  border-color: #000080;
+  background: #e8e8ff;
+}
+
+.drop-zone p {
+  margin: 5px 0;
+  font-size: 12px;
+}
+
+.drop-zone-hint {
+  color: #808080;
+  font-size: 11px !important;
+}
+
+/* Audio Controller Window */
+.audio-controller-window {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 350px;
+  z-index: 1000000001;
+}
+
+.audio-controller-window.hidden {
+  display: none;
+}
+
+.audio-controller-content.win98-content {
+  background: #c0c0c0;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.audio-info {
+  background: #fff;
+  border: 2px inset #808080;
+  padding: 6px 8px;
+  min-height: 36px;
+}
+
+.audio-track {
+  font-size: 11px;
+  font-weight: bold;
+  color: #000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audio-artist {
+  font-size: 10px;
+  color: #404040;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.audio-progress-container {
+  height: 16px;
+  background: #fff;
+  border: 2px inset #808080;
+  cursor: pointer;
+}
+
+.audio-progress {
+  height: 100%;
+  background: #000080;
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+.audio-time {
+  font-size: 11px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+
+.audio-controls {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.audio-btn {
+  width: 32px;
+  height: 24px;
+  font-size: 11px;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.audio-btn.active {
+  background: #a0a0ff;
+  border-style: inset;
 }

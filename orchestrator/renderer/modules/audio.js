@@ -2,12 +2,9 @@
 // AUDIO CAPTURE & ANALYSIS
 // =============================================================================
 
-import { CONFIG, TEST_AUDIO_FILE } from './config.js';
+import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { setStatus } from './ui.js';
-
-// Audio source element (for file playback)
-let audioElement = null;
 
 export async function initAudio() {
   try {
@@ -16,69 +13,20 @@ export async function initAudio() {
     state.analyser.fftSize = CONFIG.FFT_SIZE;
     state.analyser.smoothingTimeConstant = 0.3;
 
-    let source;
-
-    if (TEST_AUDIO_FILE) {
-      // File playback mode for testing
-      audioElement = new Audio();
-      audioElement.crossOrigin = 'anonymous';
-      audioElement.loop = true;
-
-      // Load file via Electron's file protocol
-      audioElement.src = `file://${TEST_AUDIO_FILE}`;
-
-      await new Promise((resolve, reject) => {
-        audioElement.addEventListener('canplaythrough', resolve, { once: true });
-        audioElement.addEventListener('error', reject, { once: true });
-      });
-
-      source = state.audioContext.createMediaElementSource(audioElement);
-      source.connect(state.analyser);
-      state.analyser.connect(state.audioContext.destination); // Play through speakers
-
-      setStatus('test audio loaded - press play');
-    } else {
-      // Microphone mode
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      source = state.audioContext.createMediaStreamSource(stream);
-      source.connect(state.analyser);
-    }
+    // Microphone capture
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const source = state.audioContext.createMediaStreamSource(stream);
+    source.connect(state.analyser);
 
     state.frequencyData = new Uint8Array(state.analyser.frequencyBinCount);
     state.timeDomainData = new Uint8Array(state.analyser.fftSize);
     state.audioEnabled = true;
+
+    setStatus('mic ready (cmd+s to start)');
   } catch (err) {
     console.error('Audio init failed:', err);
     setStatus('audio init failed: ' + err.message);
   }
-}
-
-export function playTestAudio() {
-  if (audioElement) {
-    audioElement.play();
-    setStatus('playing test audio');
-  }
-}
-
-export function pauseTestAudio() {
-  if (audioElement) {
-    audioElement.pause();
-    setStatus('paused');
-  }
-}
-
-export function seekTestAudio(time) {
-  if (audioElement) {
-    audioElement.currentTime = time;
-  }
-}
-
-export function getTestAudioTime() {
-  return audioElement ? audioElement.currentTime : 0;
-}
-
-export function isTestMode() {
-  return TEST_AUDIO_FILE !== null;
 }
 
 export function getVolume() {
