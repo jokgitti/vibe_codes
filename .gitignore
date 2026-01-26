@@ -11,8 +11,13 @@
 *.swo
 *~
 
-# Node (if added later)
+# Node
 node_modules/
+
+# Python
+venv/
+__pycache__/
+*.pyc
 npm-debug.log*
 yarn-error.log*
 
