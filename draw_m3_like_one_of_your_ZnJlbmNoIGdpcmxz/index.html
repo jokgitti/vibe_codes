@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: black;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .ascii-container {
+      display: flex;
+      flex-direction: column;
+      font-family: monospace;
+      font-size: 8px; /* Initial size, will be overridden by JS */
+      line-height: 1;
+      letter-spacing: 0px;
+      white-space: pre;
+    }
+
+    .ascii-line {
+      color: white;
+      opacity: 0.15;
+      transition: opacity 0.1s ease;
+    }
+
+    .loading {
+      color: white;
+      font-family: monospace;
+      opacity: 0.5;
+    }
+
+    .error {
+      color: red;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="ascii-container" id="container">
+    <div class="loading">loading...</div>
+  </div>
+
+  <script>
+    const IMAGE_URL = 'https://www.striscialanotizia.mediaset.it/wp-content/uploads/2022/09/gabibboo.jpg';
+    const ASCII_SERVICE = 'http://localhost:3002';
+    const COLUMNS = 60;
+
+    const container = document.getElementById('container');
+    let lines = [];
+
+    // Fetch ASCII art from the service
+    async function loadAsciiArt() {
+      try {
+        const response = await fetch(
+          `${ASCII_SERVICE}/convert-url?url=${encodeURIComponent(IMAGE_URL)}&columns=${COLUMNS}`,
+          { method: 'POST' }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const asciiText = await response.text();
+        renderAscii(asciiText);
+      } catch (err) {
+        container.innerHTML = `<div class="error">failed to load: ${err.message}</div>`;
+        console.error('Failed to load ASCII art:', err);
+      }
+    }
+
+    // Render ASCII art as individual lines
+    function renderAscii(text) {
+      container.innerHTML = '';
+      lines = [];
+      const asciiLines = text.split('\n').filter(line => line.length > 0);
+
+      asciiLines.forEach((lineText, index) => {
+        const lineEl = document.createElement('div');
+        lineEl.className = 'ascii-line';
+        lineEl.textContent = lineText;
+        container.appendChild(lineEl);
+        lines.push(lineEl);
+      });
+
+      // Scale to fit window
+      scaleToFit(asciiLines);
+    }
+
+    // Scale font size to fill the window
+    function scaleToFit(asciiLines) {
+      if (asciiLines.length === 0) return;
+
+      const numLines = asciiLines.length;
+      const numCols = asciiLines[0].length;
+
+      // Monospace char width is roughly 0.6 * fontSize
+      const charWidthRatio = 0.6;
+
+      const windowW = window.innerWidth;
+      const windowH = window.innerHeight;
+
+      // Calculate font size to fit width and height
+      const fontSizeByWidth = windowW / (numCols * charWidthRatio);
+      const fontSizeByHeight = windowH / numLines;
+
+      // Use the smaller to ensure it fits both dimensions
+      const fontSize = Math.floor(Math.min(fontSizeByWidth, fontSizeByHeight));
+
+      container.style.fontSize = `${fontSize}px`;
+    }
+
+    // Recalculate on resize
+    window.addEventListener('resize', () => {
+      if (lines.length > 0) {
+        const asciiLines = lines.map(el => el.textContent);
+        scaleToFit(asciiLines);
+      }
+    });
+
+    // Update line opacities based on time domain audio data
+    function updateOpacities(timeDomainData) {
+      if (lines.length === 0) return;
+
+      const dataArray = new Uint8Array(timeDomainData);
+      const step = Math.floor(dataArray.length / lines.length);
+
+      for (let i = 0; i < lines.length; i++) {
+        // Get sample value (0-255, center is 128)
+        const sample = dataArray[i * step] || 128;
+
+        // Calculate deviation from center (silence)
+        // Silence (128) -> 0 deviation
+        // Loud (0 or 255) -> 128 deviation
+        const deviation = Math.abs(sample - 128);
+
+        // Map deviation to opacity (0.15 to 1.0)
+        // deviation 0 -> 0.15 (dim)
+        // deviation 128 -> 1.0 (bright)
+        const minOpacity = 0.15;
+        const maxOpacity = 1.0;
+        const normalizedDeviation = deviation / 128;
+        const opacity = minOpacity + (normalizedDeviation * (maxOpacity - minOpacity));
+
+        lines[i].style.opacity = opacity;
+      }
+    }
+
+    // Listen for external audio data from orchestrator
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'audio' && e.data.timeDomainData) {
+        updateOpacities(e.data.timeDomainData);
+      }
+    });
+
+    // Standalone mode: initialize local audio
+    let localAudioInitialized = false;
+
+    async function initLocalAudio() {
+      if (localAudioInitialized) return;
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+
+        analyser.fftSize = 512;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.fftSize);
+
+        function update() {
+          analyser.getByteTimeDomainData(dataArray);
+          updateOpacities(dataArray);
+          requestAnimationFrame(update);
+        }
+
+        localAudioInitialized = true;
+        update();
+      } catch (err) {
+        console.log('Microphone access denied - waiting for orchestrator audio');
+      }
+    }
+
+    // Load ASCII art and optionally init local audio
+    loadAsciiArt();
+
+    // Only init local audio if not receiving external audio after a delay
+    setTimeout(() => {
+      if (lines.length > 0) {
+        initLocalAudio();
+      }
+    }, 2000);
+  </script>
+</body>
+</html>
