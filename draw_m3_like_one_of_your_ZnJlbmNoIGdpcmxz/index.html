@@ -55,15 +55,18 @@
 
   <script>
     // Config
-    const FONT_SIZE = 10; // Base font size in pixels
+    const DEFAULT_FONT_SIZE = 10; // Default font size in pixels
+    const MIN_FONT_SIZE = 4; // Minimum font size
     const CHAR_WIDTH_RATIO = 0.455; // Matches ascii_magic's width_ratio of 2.2
 
     const container = document.getElementById('container');
     let lines = [];
     let currentImage = null;
+    let maxConstraints = null; // Will be set by orchestrator init message
+    let currentFontSize = DEFAULT_FONT_SIZE;
 
-    // Load ASCII art from gallery.json
-    async function loadAsciiArt() {
+    // Load gallery and store selected image (don't render yet)
+    async function loadGallery() {
       try {
         const response = await fetch('gallery.json');
         if (!response.ok) throw new Error('gallery.json not found');
@@ -74,20 +77,50 @@
         }
 
         // Pick a random image from the gallery
-        const img = gallery.images[Math.floor(Math.random() * gallery.images.length)];
-        currentImage = img;
-        renderAscii(img.lines);
-        requestResize(img.columns, img.lines.length);
+        currentImage = gallery.images[Math.floor(Math.random() * gallery.images.length)];
+        return currentImage;
       } catch (err) {
         container.innerHTML = `<div class="error">failed to load: ${err.message}</div>`;
         console.error('Failed to load ASCII art:', err);
+        return null;
       }
+    }
+
+    // Calculate optimal font size to fit within constraints
+    function calculateFontSize(columns, numLines, maxWidth, maxHeight) {
+      // Calculate max font size that fits width
+      const fontSizeByWidth = maxWidth / (columns * CHAR_WIDTH_RATIO);
+      // Calculate max font size that fits height
+      const fontSizeByHeight = maxHeight / numLines;
+      // Use the smaller of the two, clamped between min and default (never scale UP)
+      return Math.max(MIN_FONT_SIZE, Math.min(DEFAULT_FONT_SIZE, Math.floor(Math.min(fontSizeByWidth, fontSizeByHeight))));
+    }
+
+    // Render with current image and constraints
+    function renderWithConstraints() {
+      if (!currentImage) return;
+
+      const columns = currentImage.columns;
+      const numLines = currentImage.lines.length;
+
+      if (maxConstraints) {
+        // Calculate font size to fit within orchestrator constraints
+        currentFontSize = calculateFontSize(columns, numLines, maxConstraints.maxWidth, maxConstraints.maxHeight);
+      } else {
+        // Standalone mode: use window dimensions or default
+        const maxWidth = window.innerWidth - 20;
+        const maxHeight = window.innerHeight - 20;
+        currentFontSize = calculateFontSize(columns, numLines, maxWidth, maxHeight);
+      }
+
+      renderAscii(currentImage.lines);
+      requestResize(columns, numLines);
     }
 
     // Request parent window to resize based on ASCII dimensions
     function requestResize(columns, numLines) {
-      const width = Math.ceil(columns * CHAR_WIDTH_RATIO * FONT_SIZE);
-      const height = numLines * FONT_SIZE;
+      const width = Math.ceil(columns * CHAR_WIDTH_RATIO * currentFontSize);
+      const height = numLines * currentFontSize;
 
       // Send resize request to parent (orchestrator)
       if (window.parent !== window) {
@@ -96,14 +129,9 @@
     }
 
     // Render ASCII art as individual lines
-    // Accepts either an array of lines or a string
-    function renderAscii(input) {
+    function renderAscii(asciiLines) {
       container.innerHTML = '';
       lines = [];
-
-      const asciiLines = Array.isArray(input)
-        ? input
-        : input.split('\n').filter(line => line.length > 0);
 
       asciiLines.forEach((lineText) => {
         const lineEl = document.createElement('div');
@@ -113,8 +141,7 @@
         lines.push(lineEl);
       });
 
-      // Use fixed font size for exact dimensions
-      container.style.fontSize = `${FONT_SIZE}px`;
+      container.style.fontSize = `${currentFontSize}px`;
     }
 
     // Update line opacities based on time domain audio data
@@ -145,9 +172,17 @@
       }
     }
 
-    // Listen for external audio data from orchestrator
+    // Listen for messages from orchestrator
     window.addEventListener('message', (e) => {
-      if (e.data && e.data.type === 'audio' && e.data.timeDomainData) {
+      if (!e.data) return;
+
+      if (e.data.type === 'init') {
+        // Received constraints from orchestrator
+        maxConstraints = { maxWidth: e.data.maxWidth, maxHeight: e.data.maxHeight };
+        if (currentImage) {
+          renderWithConstraints();
+        }
+      } else if (e.data.type === 'audio' && e.data.timeDomainData) {
         updateOpacities(e.data.timeDomainData);
       }
     });
@@ -182,8 +217,27 @@
       }
     }
 
-    // Load ASCII art and optionally init local audio
-    loadAsciiArt();
+    // Initialize: load gallery, then wait for orchestrator or render standalone
+    async function init() {
+      await loadGallery();
+
+      // If in orchestrator, wait for init message (handled by message listener)
+      // If standalone, render after a short delay
+      if (window.parent === window) {
+        // Standalone mode - render immediately
+        renderWithConstraints();
+      } else {
+        // In iframe - wait a bit for init message, fallback to standalone render
+        setTimeout(() => {
+          if (lines.length === 0 && currentImage) {
+            // No init received, render with defaults
+            renderWithConstraints();
+          }
+        }, 500);
+      }
+    }
+
+    init();
 
     // Only init local audio if not receiving external audio after a delay
     setTimeout(() => {

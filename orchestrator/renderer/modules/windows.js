@@ -46,6 +46,19 @@ export function resizeWindow(id, contentWidth, contentHeight) {
     content.style.width = `${contentWidth}px`;
     content.style.height = `${contentHeight}px`;
   }
+
+  // Ensure window stays within bounds
+  const containerWidth = windowContainer.clientWidth;
+  const containerHeight = windowContainer.clientHeight;
+  let x = parseInt(windowEl.style.left);
+  let y = parseInt(windowEl.style.top);
+
+  // Clamp position to keep window in bounds
+  x = Math.max(CONFIG.WINDOW_GAP, Math.min(x, containerWidth - totalWidth - CONFIG.WINDOW_GAP));
+  y = Math.max(CONFIG.WINDOW_GAP, Math.min(y, containerHeight - totalHeight - CONFIG.WINDOW_GAP));
+
+  windowEl.style.left = `${x}px`;
+  windowEl.style.top = `${y}px`;
 }
 
 // =============================================================================
@@ -329,6 +342,17 @@ export function createVirtualWindowWithProject(project) {
   if (gridIndex >= 0 && gridIndex < state.gridCells.length) {
     state.gridCells[gridIndex] = id;
   }
+
+  // Send init message with max dimensions when iframe loads
+  iframe.addEventListener('load', () => {
+    const maxWidth = windowContainer.clientWidth - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
+    const maxHeight = windowContainer.clientHeight - CONFIG.TITLEBAR_HEIGHT - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
+    iframe.contentWindow.postMessage({
+      type: 'init',
+      maxWidth,
+      maxHeight
+    }, '*');
+  });
 
   // Remove spawning class after animation
   setTimeout(() => windowEl.classList.remove('spawning'), 300);
