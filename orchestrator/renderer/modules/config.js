@@ -45,6 +45,7 @@ export const CONFIG = {
 
 // Available projects
 export const PROJECTS = [
+  'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz',
   'circling_cycle',
   'lucid_dream',
   'pitchy_soundwave',

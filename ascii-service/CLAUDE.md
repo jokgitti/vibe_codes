@@ -1,119 +1,79 @@
-# ASCII Art Service
+# ASCII Art CLI
 
-A Python FastAPI service that converts images to ASCII art using ascii_magic.
+A Python CLI tool that converts images to ASCII art using ascii_magic.
 
 ## Overview
 
-- **Runtime**: Python 3 with FastAPI
+- **Runtime**: Python 3
 - **Library**: ascii_magic for image-to-ASCII conversion
-- **Port**: 3002
 
 ## Prerequisites
 
 Python 3.x installed on the system.
 
-## Running
+## Setup
 
-```bash
-# One-time setup
-make ascii-install
-
-# Start the service
-make ascii
-```
-
-Or manually:
 ```bash
 cd ascii-service
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt
-./venv/bin/uvicorn main:app --host 0.0.0.0 --port 3002
 ```
 
-## Configuration
+## CLI Usage
 
-The service runs on port 3002 by default. Modify the uvicorn command in the Makefile to change.
+```bash
+# Basic conversion (outputs to terminal)
+./venv/bin/python cli.py image.jpg
 
-## API Endpoints
+# Specify columns
+./venv/bin/python cli.py image.png --columns 160
 
-### GET /health
+# Output as HTML
+./venv/bin/python cli.py image.jpg --mode html > output.html
 
-Health check endpoint.
+# Output as JSON (for gallery.json)
+./venv/bin/python cli.py image.jpg --mode json --id myimage
 
-Response:
+# Append to existing gallery
+./venv/bin/python cli.py image.jpg --mode json --id myimage -c 160 --append-to ../project/gallery.json
+
+# From URL
+./venv/bin/python cli.py --url https://example.com/image.jpg
+```
+
+## Options
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--columns` | `-c` | 80 | Width in characters |
+| `--mode` | `-m` | terminal | Output: `terminal`, `html`, or `json` |
+| `--id` | | filename | Identifier for JSON output |
+| `--append-to` | `-a` | | Append to existing JSON gallery file |
+| `--url` | | | Load image from URL instead of file |
+
+## JSON Output Format
+
+Single image:
 ```json
-{ "status": "ok" }
+{
+  "id": "myimage",
+  "source": "image.jpg",
+  "columns": 160,
+  "lines": ["line1", "line2", ...]
+}
 ```
 
-### POST /convert
-
-Convert an uploaded image file to ASCII art.
-
-Parameters (query string):
-- `columns` - Width in characters (default: 80, range: 10-300)
-- `mode` - Output format: `terminal` (plain text) or `html` (colored)
-
-Request:
-```bash
-curl -X POST "http://localhost:3002/convert?columns=60" \
-  -F "file=@image.jpg"
-```
-
-Response: Plain text ASCII art (or HTML if mode=html)
-
-### POST /convert-url
-
-Convert an image from URL to ASCII art.
-
-Parameters (query string):
-- `url` - Image URL (required)
-- `columns` - Width in characters (default: 80, range: 10-300)
-- `mode` - Output format: `terminal` (plain text) or `html` (colored)
-
-Request:
-```bash
-curl -X POST "http://localhost:3002/convert-url?url=https://example.com/image.jpg&columns=60"
-```
-
-Response: Plain text ASCII art (or HTML if mode=html)
-
-## JavaScript Usage
-
-```javascript
-// From URL
-const res = await fetch('http://localhost:3002/convert-url?url=IMAGE_URL&columns=60', {
-  method: 'POST'
-});
-const ascii = await res.text();
-
-// From file upload
-const formData = new FormData();
-formData.append('file', fileInput.files[0]);
-const res = await fetch('http://localhost:3002/convert?columns=60', {
-  method: 'POST',
-  body: formData
-});
-const ascii = await res.text();
-```
-
-## Output Modes
-
-- **terminal**: Monochrome ASCII characters, suitable for terminal display
-- **html**: Colored HTML output with ANSI colors preserved
-
-## Architecture
-
-```
-┌────────────┐              ┌───────────────┐
-│  JS App    │ ──POST───►   │ ascii-service │
-└────────────┘   :3002      │   (FastAPI)   │
-                            └───────────────┘
+Gallery format (when using `--append-to`):
+```json
+{
+  "images": [
+    { "id": "img1", "source": "...", "columns": 160, "lines": [...] },
+    { "id": "img2", "source": "...", "columns": 120, "lines": [...] }
+  ]
+}
 ```
 
 ## Dependencies
 
-- fastapi - Web framework
-- uvicorn - ASGI server
 - ascii_magic - Image to ASCII conversion
 - pillow - Image processing
-- python-multipart - File upload handling

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: black;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .ascii-container {
+      display: flex;
+      flex-direction: column;
+      font-family: monospace;
+      font-size: 8px; /* Initial size, will be overridden by JS */
+      line-height: 1;
+      letter-spacing: 0px;
+      white-space: pre;
+    }
+
+    .ascii-line {
+      color: white;
+      opacity: 0.15;
+      transition: opacity 0.1s ease;
+    }
+
+    .loading {
+      color: white;
+      font-family: monospace;
+      opacity: 0.5;
+    }
+
+    .error {
+      color: red;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="ascii-container" id="container">
+    <div class="loading">loading...</div>
+  </div>
+
+  <script>
+    // Config
+    const DEFAULT_FONT_SIZE = 10; // Default font size in pixels
+    const MIN_FONT_SIZE = 4; // Minimum font size
+    const CHAR_WIDTH_RATIO = 0.455; // Matches ascii_magic's width_ratio of 2.2
+
+    const container = document.getElementById('container');
+    let lines = [];
+    let currentImage = null;
+    let maxConstraints = null; // Will be set by orchestrator init message
+    let currentFontSize = DEFAULT_FONT_SIZE;
+
+    // Load gallery and store selected image (don't render yet)
+    async function loadGallery() {
+      try {
+        const response = await fetch('gallery.json');
+        if (!response.ok) throw new Error('gallery.json not found');
+
+        const gallery = await response.json();
+        if (!gallery.images || gallery.images.length === 0) {
+          throw new Error('no images in gallery');
+        }
+
+        // Pick a random image from the gallery
+        currentImage = gallery.images[Math.floor(Math.random() * gallery.images.length)];
+        return currentImage;
+      } catch (err) {
+        container.innerHTML = `<div class="error">failed to load: ${err.message}</div>`;
+        console.error('Failed to load ASCII art:', err);
+        return null;
+      }
+    }
+
+    // Calculate optimal font size to fit within constraints
+    function calculateFontSize(columns, numLines, maxWidth, maxHeight) {
+      // Calculate max font size that fits width
+      const fontSizeByWidth = maxWidth / (columns * CHAR_WIDTH_RATIO);
+      // Calculate max font size that fits height
+      const fontSizeByHeight = maxHeight / numLines;
+      // Use the smaller of the two, clamped between min and default (never scale UP)
+      return Math.max(MIN_FONT_SIZE, Math.min(DEFAULT_FONT_SIZE, Math.floor(Math.min(fontSizeByWidth, fontSizeByHeight))));
+    }
+
+    // Render with current image and constraints
+    function renderWithConstraints() {
+      if (!currentImage) return;
+
+      const columns = currentImage.columns;
+      const numLines = currentImage.lines.length;
+
+      if (maxConstraints) {
+        // Calculate font size to fit within orchestrator constraints
+        currentFontSize = calculateFontSize(columns, numLines, maxConstraints.maxWidth, maxConstraints.maxHeight);
+      } else {
+        // Standalone mode: use window dimensions or default
+        const maxWidth = window.innerWidth - 20;
+        const maxHeight = window.innerHeight - 20;
+        currentFontSize = calculateFontSize(columns, numLines, maxWidth, maxHeight);
+      }
+
+      renderAscii(currentImage.lines);
+      requestResize(columns, numLines);
+    }
+
+    // Request parent window to resize based on ASCII dimensions
+    function requestResize(columns, numLines) {
+      const width = Math.ceil(columns * CHAR_WIDTH_RATIO * currentFontSize);
+      const height = numLines * currentFontSize;
+
+      // Send resize request to parent (orchestrator)
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'resize', width, height }, '*');
+      }
+    }
+
+    // Render ASCII art as individual lines
+    function renderAscii(asciiLines) {
+      container.innerHTML = '';
+      lines = [];
+
+      asciiLines.forEach((lineText) => {
+        const lineEl = document.createElement('div');
+        lineEl.className = 'ascii-line';
+        lineEl.textContent = lineText;
+        container.appendChild(lineEl);
+        lines.push(lineEl);
+      });
+
+      container.style.fontSize = `${currentFontSize}px`;
+    }
+
+    // Update line opacities based on time domain audio data
+    function updateOpacities(timeDomainData) {
+      if (lines.length === 0) return;
+
+      const dataArray = new Uint8Array(timeDomainData);
+      const step = Math.floor(dataArray.length / lines.length);
+
+      for (let i = 0; i < lines.length; i++) {
+        // Get sample value (0-255, center is 128)
+        const sample = dataArray[i * step] || 128;
+
+        // Calculate deviation from center (silence)
+        // Silence (128) -> 0 deviation
+        // Loud (0 or 255) -> 128 deviation
+        const deviation = Math.abs(sample - 128);
+
+        // Map deviation to opacity (0.15 to 1.0)
+        // deviation 0 -> 0.15 (dim)
+        // deviation 128 -> 1.0 (bright)
+        const minOpacity = 0.15;
+        const maxOpacity = 1.0;
+        const normalizedDeviation = deviation / 128;
+        const opacity = minOpacity + (normalizedDeviation * (maxOpacity - minOpacity));
+
+        lines[i].style.opacity = opacity;
+      }
+    }
+
+    // Listen for messages from orchestrator
+    window.addEventListener('message', (e) => {
+      if (!e.data) return;
+
+      if (e.data.type === 'init') {
+        // Received constraints from orchestrator
+        maxConstraints = { maxWidth: e.data.maxWidth, maxHeight: e.data.maxHeight };
+        if (currentImage) {
+          renderWithConstraints();
+        }
+      } else if (e.data.type === 'audio' && e.data.timeDomainData) {
+        updateOpacities(e.data.timeDomainData);
+      }
+    });
+
+    // Standalone mode: initialize local audio
+    let localAudioInitialized = false;
+
+    async function initLocalAudio() {
+      if (localAudioInitialized) return;
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+
+        analyser.fftSize = 512;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.fftSize);
+
+        function update() {
+          analyser.getByteTimeDomainData(dataArray);
+          updateOpacities(dataArray);
+          requestAnimationFrame(update);
+        }
+
+        localAudioInitialized = true;
+        update();
+      } catch (err) {
+        console.log('Microphone access denied - waiting for orchestrator audio');
+      }
+    }
+
+    // Initialize: load gallery, then wait for orchestrator or render standalone
+    async function init() {
+      await loadGallery();
+
+      // If in orchestrator, wait for init message (handled by message listener)
+      // If standalone, render after a short delay
+      if (window.parent === window) {
+        // Standalone mode - render immediately
+        renderWithConstraints();
+      } else {
+        // In iframe - wait a bit for init message, fallback to standalone render
+        setTimeout(() => {
+          if (lines.length === 0 && currentImage) {
+            // No init received, render with defaults
+            renderWithConstraints();
+          }
+        }, 500);
+      }
+    }
+
+    init();
+
+    // Only init local audio if not receiving external audio after a delay
+    setTimeout(() => {
+      if (lines.length > 0) {
+        initLocalAudio();
+      }
+    }, 2000);
+  </script>
+</body>
+</html>
