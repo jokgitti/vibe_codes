@@ -11,6 +11,41 @@ let windowContainer;
 
 export function initWindowContainer() {
   windowContainer = document.getElementById('windowContainer');
+
+  // Listen for resize requests from iframes
+  window.addEventListener('message', handleIframeMessage);
+}
+
+function handleIframeMessage(event) {
+  if (!event.data || event.data.type !== 'resize') return;
+
+  const { width, height } = event.data;
+  if (!width || !height) return;
+
+  // Find which window sent this message
+  const win = state.virtualWindows.find(w => w.iframe.contentWindow === event.source);
+  if (!win) return;
+
+  resizeWindow(win.id, width, height);
+}
+
+export function resizeWindow(id, contentWidth, contentHeight) {
+  const win = state.virtualWindows.find(w => w.id === id);
+  if (!win) return;
+
+  const windowEl = win.element;
+  const totalWidth = contentWidth + CONFIG.CHROME_PADDING;
+  const totalHeight = contentHeight + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+
+  windowEl.style.width = `${totalWidth}px`;
+  windowEl.style.height = `${totalHeight}px`;
+
+  // Update iframe size
+  const content = windowEl.querySelector('.win98-content');
+  if (content) {
+    content.style.width = `${contentWidth}px`;
+    content.style.height = `${contentHeight}px`;
+  }
 }
 
 // =============================================================================
