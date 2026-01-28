@@ -65,6 +65,11 @@
     let maxConstraints = null; // Will be set by orchestrator init message
     let currentFontSize = DEFAULT_FONT_SIZE;
 
+    // GIF animation state
+    let isAnimated = false;
+    let frames = [];
+    let currentFrameIndex = 0;
+
     // Load gallery and store selected image (don't render yet)
     async function loadGallery() {
       try {
@@ -100,8 +105,13 @@
     function renderWithConstraints() {
       if (!currentImage) return;
 
+      // Check if this is an animated GIF (has frames) or static image (has lines)
+      isAnimated = Array.isArray(currentImage.frames) && currentImage.frames.length > 0;
+      frames = isAnimated ? currentImage.frames : [currentImage.lines];
+      currentFrameIndex = 0;
+
       const columns = currentImage.columns;
-      const numLines = currentImage.lines.length;
+      const numLines = frames[0].length;
 
       if (maxConstraints) {
         // Calculate font size to fit within orchestrator constraints
@@ -113,8 +123,16 @@
         currentFontSize = calculateFontSize(columns, numLines, maxWidth, maxHeight);
       }
 
-      renderAscii(currentImage.lines);
+      renderAscii(frames[0]);
       requestResize(columns, numLines);
+    }
+
+    // Advance to next frame (for animated GIFs)
+    function nextFrame() {
+      if (!isAnimated || frames.length <= 1) return;
+
+      currentFrameIndex = (currentFrameIndex + 1) % frames.length;
+      renderAscii(frames[currentFrameIndex]);
     }
 
     // Request parent window to resize based on ASCII dimensions
@@ -182,8 +200,14 @@
         if (currentImage) {
           renderWithConstraints();
         }
-      } else if (e.data.type === 'audio' && e.data.timeDomainData) {
-        updateOpacities(e.data.timeDomainData);
+      } else if (e.data.type === 'audio') {
+        if (e.data.timeDomainData) {
+          updateOpacities(e.data.timeDomainData);
+        }
+        // Advance frame on beat (for animated GIFs)
+        if (e.data.beat && isAnimated) {
+          nextFrame();
+        }
       }
     });
 

@@ -7,11 +7,41 @@ Usage:
     ./cli.py image.png --columns 120
     ./cli.py image.jpg --mode html > output.html
     ./cli.py image.jpg --mode json --id portrait > art.json
+    ./cli.py animation.gif --mode json --id anim  # extracts all frames
 """
 import argparse
 import json
 import os
 import ascii_magic
+from PIL import Image
+
+
+def is_animated_gif(filepath):
+    """Check if file is an animated GIF with multiple frames."""
+    try:
+        with Image.open(filepath) as img:
+            return img.format == "GIF" and getattr(img, "n_frames", 1) > 1
+    except Exception:
+        return False
+
+
+def extract_gif_frames(filepath, columns):
+    """Extract all frames from a GIF and convert each to ASCII."""
+    frames = []
+    with Image.open(filepath) as img:
+        n_frames = img.n_frames
+        print(f"Extracting {n_frames} frames...", file=__import__("sys").stderr)
+
+        for i in range(n_frames):
+            img.seek(i)
+            # Convert to RGB (GIF frames may be palette mode)
+            frame = img.convert("RGB")
+            art = ascii_magic.from_pillow_image(frame)
+            ascii_text = art.to_ascii(columns=columns, monochrome=True)
+            lines = [line for line in ascii_text.split("\n") if line]
+            frames.append(lines)
+
+    return frames
 
 
 def main():
@@ -25,6 +55,7 @@ Examples:
     %(prog)s photo.jpg --mode html > output.html
     %(prog)s photo.jpg --mode json --id portrait
     %(prog)s photo.jpg --mode json --id portrait --append-to gallery.json
+    %(prog)s animation.gif --mode json --id anim  # extracts all GIF frames
     %(prog)s --url https://example.com/image.jpg
         """,
     )
@@ -58,21 +89,26 @@ Examples:
     if args.file and args.url:
         parser.error("Cannot specify both FILE and --url")
 
+    # Check if input is an animated GIF
+    is_gif = args.file and is_animated_gif(args.file)
+
     # Load image
     if args.url:
         art = ascii_magic.from_url(args.url)
         source = args.url
+    elif is_gif:
+        source = os.path.basename(args.file)
+        # GIF handling is done separately for JSON mode
     else:
         art = ascii_magic.from_image(args.file)
         source = os.path.basename(args.file)
 
     # Convert and output
     if args.mode == "html":
+        if is_gif:
+            parser.error("HTML mode not supported for animated GIFs")
         print(art.to_html(columns=args.columns))
     elif args.mode == "json":
-        ascii_text = art.to_ascii(columns=args.columns, monochrome=True)
-        lines = [line for line in ascii_text.split("\n") if line]
-
         # Determine ID
         image_id = args.id
         if not image_id:
@@ -81,12 +117,24 @@ Examples:
             else:
                 image_id = "image"
 
-        entry = {
-            "id": image_id,
-            "source": source,
-            "columns": args.columns,
-            "lines": lines,
-        }
+        if is_gif:
+            # Extract all GIF frames
+            frames = extract_gif_frames(args.file, args.columns)
+            entry = {
+                "id": image_id,
+                "source": source,
+                "columns": args.columns,
+                "frames": frames,
+            }
+        else:
+            ascii_text = art.to_ascii(columns=args.columns, monochrome=True)
+            lines = [line for line in ascii_text.split("\n") if line]
+            entry = {
+                "id": image_id,
+                "source": source,
+                "columns": args.columns,
+                "lines": lines,
+            }
 
         if args.append_to:
             # Load existing file or create new structure
@@ -105,12 +153,17 @@ Examples:
 
             with open(args.append_to, "w") as f:
                 json.dump(data, f)
-            print(f"Added '{image_id}' to {args.append_to}")
+            print(f"Added '{image_id}' ({len(entry.get('frames', [entry.get('lines', [])]))} frame(s)) to {args.append_to}")
         else:
             # Output single image JSON
             print(json.dumps(entry))
     else:
-        print(art.to_ascii(columns=args.columns, monochrome=True))
+        if is_gif:
+            # For terminal mode, just show first frame
+            frames = extract_gif_frames(args.file, args.columns)
+            print("\n".join(frames[0]))
+        else:
+            print(art.to_ascii(columns=args.columns, monochrome=True))
 
 
 if __name__ == "__main__":
