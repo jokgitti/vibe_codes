@@ -8,6 +8,12 @@ import { state } from './state.js';
 // DOM Elements (cached on module load)
 let windowBar, windowCountEl, audioBar, statusEl, thresholdLine;
 
+// Cache previous values to avoid unnecessary DOM updates
+let prevAudioWidth = -1;
+let prevThresholdLeft = -1;
+let prevWindowWidth = -1;
+let prevWindowCount = '';
+
 export function initUI() {
   windowBar = document.getElementById('windowBar');
   windowCountEl = document.getElementById('windowCount');
@@ -19,35 +25,41 @@ export function initUI() {
 export function updateUI() {
   if (!state.analyser || !windowBar) return;
 
-  // Get current volume for audio bar
-  let volume = 0;
-  if (state.timeDomainData) {
-    state.analyser.getByteTimeDomainData(state.timeDomainData);
-    let sum = 0;
-    for (let i = 0; i < state.timeDomainData.length; i++) {
-      sum += Math.abs(state.timeDomainData[i] - 128);
-    }
-    volume = sum / state.timeDomainData.length;
-  }
-
+  // Use cached volume from state (already calculated in analyzeLoop)
+  const volume = state.currentVolume || 0;
   const normalizedVolume = Math.min(volume / 50, 1);
-  audioBar.style.width = `${normalizedVolume * 100}%`;
+  const audioWidth = Math.round(normalizedVolume * 100);
+
+  // Only update DOM if value changed
+  if (audioWidth !== prevAudioWidth) {
+    audioBar.style.width = `${audioWidth}%`;
+    prevAudioWidth = audioWidth;
+  }
 
   // Update threshold line position (onset detection)
-  // Shows: recentAvg + onsetThreshold (the level volume must exceed)
-  let recentAvg = 0;
-  if (state.onsetHistory.length > 1) {
-    const previous = state.onsetHistory.slice(0, -1);
-    recentAvg = previous.reduce((a, b) => a + b, 0) / previous.length;
-  }
+  // Use cached recentAvg from state to avoid array operations
+  const recentAvg = state.cachedRecentAvg || 0;
   const onsetThreshold = CONFIG.ONSET_THRESHOLD_BASE / state.sensitivity;
   const triggerLevel = recentAvg + onsetThreshold;
   const normalizedThreshold = Math.min(triggerLevel / 50, 1);
-  thresholdLine.style.left = `${normalizedThreshold * 100}%`;
+  const thresholdLeft = Math.round(normalizedThreshold * 100);
 
-  const windowPercent = (state.virtualWindows.length / CONFIG.MAX_WINDOWS) * 100;
-  windowBar.style.width = `${windowPercent}%`;
-  windowCountEl.textContent = `${state.virtualWindows.length}/${CONFIG.MAX_WINDOWS}`;
+  if (thresholdLeft !== prevThresholdLeft) {
+    thresholdLine.style.left = `${thresholdLeft}%`;
+    prevThresholdLeft = thresholdLeft;
+  }
+
+  const windowPercent = Math.round((state.virtualWindows.length / CONFIG.MAX_WINDOWS) * 100);
+  if (windowPercent !== prevWindowWidth) {
+    windowBar.style.width = `${windowPercent}%`;
+    prevWindowWidth = windowPercent;
+  }
+
+  const windowCount = `${state.virtualWindows.length}/${CONFIG.MAX_WINDOWS}`;
+  if (windowCount !== prevWindowCount) {
+    windowCountEl.textContent = windowCount;
+    prevWindowCount = windowCount;
+  }
 }
 
 export function setStatus(text) {

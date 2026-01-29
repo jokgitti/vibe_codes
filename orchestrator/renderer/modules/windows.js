@@ -375,11 +375,14 @@ export function closeVirtualWindow(id) {
     state.gridCells[win.gridIndex] = null;
   }
 
+  // Update state immediately so new windows can be created
+  state.virtualWindows.splice(idx, 1);
+  state.projectCounts[win.project]--;
+  updateUI();
+
+  // Remove DOM element after animation completes
   setTimeout(() => {
     win.element.remove();
-    state.virtualWindows.splice(idx, 1);
-    state.projectCounts[win.project]--;
-    updateUI();
   }, 200);
 }
 

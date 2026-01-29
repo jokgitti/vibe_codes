@@ -51,5 +51,9 @@ export const state = {
   onsetHistory: [],
 
   // Pending beat flag (persists until broadcast)
-  pendingBeat: false
+  pendingBeat: false,
+
+  // Cached values for UI (avoid recalculating every frame)
+  currentVolume: 0,
+  cachedRecentAvg: 0
 };

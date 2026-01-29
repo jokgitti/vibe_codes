@@ -51,10 +51,8 @@ function startDrag(windowEl, mouseX, mouseY) {
     windowEl.style.zIndex = state.currentZIndex;
   }
 
-  // Disable pointer events on all iframes during drag
-  document.querySelectorAll('iframe').forEach(iframe => {
-    iframe.style.pointerEvents = 'none';
-  });
+  // Disable pointer events on iframes using CSS class (more efficient)
+  document.body.classList.add('dragging-active');
 
   // Add dragging class for visual feedback
   windowEl.classList.add('dragging');
@@ -73,10 +71,8 @@ function handleMouseMove(e) {
 function handleMouseUp() {
   if (!isDragging) return;
 
-  // Re-enable pointer events on iframes
-  document.querySelectorAll('iframe').forEach(iframe => {
-    iframe.style.pointerEvents = '';
-  });
+  // Re-enable pointer events on iframes using CSS class
+  document.body.classList.remove('dragging-active');
 
   // Remove dragging class
   if (dragTarget) {

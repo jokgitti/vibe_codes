@@ -361,7 +361,10 @@ function analyzeLoop(currentTime) {
   const volume = getVolume();
   const avgVolume = getAverageVolume();
 
-  // Update history
+  // Cache volume for UI
+  state.currentVolume = volume;
+
+  // Update history using circular buffer approach
   state.volumeHistory.push(volume);
   if (state.volumeHistory.length > CONFIG.VOLUME_HISTORY_SIZE) {
     state.volumeHistory.shift();
@@ -377,12 +380,19 @@ function analyzeLoop(currentTime) {
   }
 
   // Calculate onset: how much volume increased from recent history
+  // Optimized: calculate sum without creating new array
   let recentAvg = 0;
-  if (state.onsetHistory.length > 1) {
-    // Average of all but the current frame
-    const previous = state.onsetHistory.slice(0, -1);
-    recentAvg = previous.reduce((a, b) => a + b, 0) / previous.length;
+  const histLen = state.onsetHistory.length;
+  if (histLen > 1) {
+    let sum = 0;
+    for (let i = 0; i < histLen - 1; i++) {
+      sum += state.onsetHistory[i];
+    }
+    recentAvg = sum / (histLen - 1);
   }
+  // Cache for UI
+  state.cachedRecentAvg = recentAvg;
+
   const onset = volume - recentAvg;
   const onsetThreshold = CONFIG.ONSET_THRESHOLD_BASE / state.sensitivity;
 
@@ -395,7 +405,11 @@ function analyzeLoop(currentTime) {
     recordBeat();
 
     // Only auto-open windows when enabled
-    if (state.autoOpenEnabled && state.virtualWindows.length < CONFIG.MAX_WINDOWS) {
+    if (state.autoOpenEnabled) {
+      // If at max windows, close oldest first to make room
+      if (state.virtualWindows.length >= CONFIG.MAX_WINDOWS) {
+        closeOldestWindow();
+      }
       createVirtualWindow();
       setStatus('beat - opening window...');
       setTimeout(() => setStatus(state.autoOpenEnabled ? 'auto-open on' : 'auto-open off'), 500);
@@ -421,10 +435,10 @@ function analyzeLoop(currentTime) {
     state.lastBroadcastTime = currentTime;
     broadcastAudioData(volume, state.pendingBeat);
     state.pendingBeat = false; // Reset after broadcast
-  }
 
-  // Update UI
-  updateUI();
+    // Update UI at same rate as broadcast (30fps is plenty for UI)
+    updateUI();
+  }
 
   requestAnimationFrame(analyzeLoop);
 }

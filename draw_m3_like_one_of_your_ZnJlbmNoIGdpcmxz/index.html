@@ -28,12 +28,15 @@
       line-height: 1;
       letter-spacing: 0px;
       white-space: pre;
+      contain: layout style paint;
     }
 
     .ascii-line {
       color: white;
       opacity: 0.15;
-      transition: opacity 0.1s ease;
+      /* Removed transition for performance - updates are fast enough */
+      will-change: opacity;
+      contain: layout style;
     }
 
     .loading {
@@ -146,47 +149,72 @@
       }
     }
 
-    // Render ASCII art as individual lines
-    function renderAscii(asciiLines) {
-      container.innerHTML = '';
-      lines = [];
+    // Cache for opacity values to avoid unnecessary style updates
+    let cachedOpacities = [];
+    const OPACITY_THRESHOLD = 0.02; // Only update if opacity changed by more than this
 
-      asciiLines.forEach((lineText) => {
-        const lineEl = document.createElement('div');
-        lineEl.className = 'ascii-line';
-        lineEl.textContent = lineText;
-        container.appendChild(lineEl);
-        lines.push(lineEl);
-      });
+    // Render ASCII art as individual lines (reuses existing elements when possible)
+    function renderAscii(asciiLines) {
+      const numLines = asciiLines.length;
+
+      // Reuse existing line elements if count matches
+      if (lines.length === numLines) {
+        for (let i = 0; i < numLines; i++) {
+          lines[i].textContent = asciiLines[i];
+        }
+      } else {
+        // Need to recreate - different line count
+        container.innerHTML = '';
+        lines = [];
+        cachedOpacities = [];
+
+        for (let i = 0; i < numLines; i++) {
+          const lineEl = document.createElement('div');
+          lineEl.className = 'ascii-line';
+          lineEl.textContent = asciiLines[i];
+          container.appendChild(lineEl);
+          lines.push(lineEl);
+          cachedOpacities.push(0.15);
+        }
+      }
 
       container.style.fontSize = `${currentFontSize}px`;
     }
 
+    // Pre-calculated constants for opacity mapping
+    const MIN_OPACITY = 0.15;
+    const OPACITY_RANGE = 0.85; // 1.0 - 0.15
+    const INV_128 = 1 / 128;
+
     // Update line opacities based on time domain audio data
     function updateOpacities(timeDomainData) {
-      if (lines.length === 0) return;
+      const numLines = lines.length;
+      if (numLines === 0) return;
 
-      const dataArray = new Uint8Array(timeDomainData);
-      const step = Math.floor(dataArray.length / lines.length);
+      // timeDomainData is already array-like, no need to create new Uint8Array
+      const dataLen = timeDomainData.length;
+      const step = (dataLen / numLines) | 0; // Bitwise floor
 
-      for (let i = 0; i < lines.length; i++) {
+      for (let i = 0; i < numLines; i++) {
         // Get sample value (0-255, center is 128)
-        const sample = dataArray[i * step] || 128;
+        const sample = timeDomainData[i * step] || 128;
 
-        // Calculate deviation from center (silence)
-        // Silence (128) -> 0 deviation
-        // Loud (0 or 255) -> 128 deviation
-        const deviation = Math.abs(sample - 128);
+        // Calculate deviation from center and map to opacity
+        // Optimized: combine operations, avoid abs() call
+        let deviation = sample - 128;
+        if (deviation < 0) deviation = -deviation;
 
         // Map deviation to opacity (0.15 to 1.0)
-        // deviation 0 -> 0.15 (dim)
-        // deviation 128 -> 1.0 (bright)
-        const minOpacity = 0.15;
-        const maxOpacity = 1.0;
-        const normalizedDeviation = deviation / 128;
-        const opacity = minOpacity + (normalizedDeviation * (maxOpacity - minOpacity));
+        const opacity = MIN_OPACITY + (deviation * INV_128 * OPACITY_RANGE);
 
-        lines[i].style.opacity = opacity;
+        // Only update DOM if opacity changed significantly
+        const cachedOpacity = cachedOpacities[i];
+        if (cachedOpacity === undefined ||
+            opacity - cachedOpacity > OPACITY_THRESHOLD ||
+            cachedOpacity - opacity > OPACITY_THRESHOLD) {
+          lines[i].style.opacity = opacity;
+          cachedOpacities[i] = opacity;
+        }
       }
     }
 
@@ -197,10 +225,12 @@
       if (e.data.type === 'init') {
         // Received constraints from orchestrator
         maxConstraints = { maxWidth: e.data.maxWidth, maxHeight: e.data.maxHeight };
+        receivingOrchestratorAudio = true;
         if (currentImage) {
           renderWithConstraints();
         }
       } else if (e.data.type === 'audio') {
+        receivingOrchestratorAudio = true;
         if (e.data.timeDomainData) {
           updateOpacities(e.data.timeDomainData);
         }
@@ -213,9 +243,10 @@
 
     // Standalone mode: initialize local audio
     let localAudioInitialized = false;
+    let receivingOrchestratorAudio = false;
 
     async function initLocalAudio() {
-      if (localAudioInitialized) return;
+      if (localAudioInitialized || receivingOrchestratorAudio) return;
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -227,15 +258,21 @@
         source.connect(analyser);
 
         const dataArray = new Uint8Array(analyser.fftSize);
+        let lastUpdateTime = 0;
+        const UPDATE_INTERVAL = 33; // ~30fps, match orchestrator
 
-        function update() {
-          analyser.getByteTimeDomainData(dataArray);
-          updateOpacities(dataArray);
+        function update(timestamp) {
+          // Throttle to 30fps to match orchestrator
+          if (timestamp - lastUpdateTime >= UPDATE_INTERVAL) {
+            analyser.getByteTimeDomainData(dataArray);
+            updateOpacities(dataArray);
+            lastUpdateTime = timestamp;
+          }
           requestAnimationFrame(update);
         }
 
         localAudioInitialized = true;
-        update();
+        requestAnimationFrame(update);
       } catch (err) {
         console.log('Microphone access denied - waiting for orchestrator audio');
       }

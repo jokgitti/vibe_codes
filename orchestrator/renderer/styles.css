@@ -518,3 +518,31 @@ button:active {
   background: #a0a0ff;
   border-style: inset;
 }
+
+/* Performance optimizations */
+
+/* Disable iframe pointer events during drag (single CSS rule vs querySelectorAll) */
+.dragging-active iframe {
+  pointer-events: none !important;
+}
+
+/* GPU-accelerate bars that animate frequently */
+.bar {
+  will-change: width;
+  transform: translateZ(0);
+}
+
+.threshold-line {
+  will-change: left;
+  transform: translateZ(0);
+}
+
+/* GPU-accelerate draggable windows */
+.win98-window.dragging {
+  will-change: left, top;
+}
+
+/* Reduce paint complexity for windows */
+.win98-window {
+  contain: layout style;
+}

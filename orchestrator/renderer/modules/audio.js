@@ -54,6 +54,22 @@ export function getMinVolume() {
   return CONFIG.MIN_VOLUME_BASE / state.sensitivity;
 }
 
+// Pre-allocated arrays for broadcast (avoid GC pressure)
+let normalizedTimeDomainBuffer = null;
+let frequencyDataBuffer = null;
+
+// Reusable data object for postMessage
+const broadcastData = {
+  type: 'audio',
+  volume: 0,
+  normalizedVolume: 0,
+  avgVolume: 0,
+  beat: false,
+  timeDomainData: null,
+  frequencyData: null,
+  timestamp: 0
+};
+
 export function broadcastAudioData(volume, beat) {
   // Get time-domain data for waveform visualizers
   if (state.analyser && state.timeDomainData) {
@@ -65,12 +81,18 @@ export function broadcastAudioData(volume, beat) {
   const normalizedVolume = Math.min(volume / 15, 1);
 
   // Compress loud signals to prevent clipping, but keep quiet signals quiet
-  let normalizedTimeDomain = [];
   if (state.timeDomainData) {
+    // Initialize buffer once
+    if (!normalizedTimeDomainBuffer || normalizedTimeDomainBuffer.length !== state.timeDomainData.length) {
+      normalizedTimeDomainBuffer = new Array(state.timeDomainData.length);
+    }
+
     // Find max deviation from center (128)
     let maxDeviation = 0;
     for (let i = 0; i < state.timeDomainData.length; i++) {
-      maxDeviation = Math.max(maxDeviation, Math.abs(state.timeDomainData[i] - 128));
+      const dev = state.timeDomainData[i] - 128;
+      if (dev > maxDeviation) maxDeviation = dev;
+      else if (-dev > maxDeviation) maxDeviation = -dev;
     }
 
     // Only compress if signal is too hot (max deviation > 50)
@@ -78,36 +100,41 @@ export function broadcastAudioData(volume, beat) {
     const maxAllowed = 50;
     const scale = maxDeviation > maxAllowed ? maxAllowed / maxDeviation : 1;
 
-    normalizedTimeDomain = new Array(state.timeDomainData.length);
     for (let i = 0; i < state.timeDomainData.length; i++) {
       const deviation = state.timeDomainData[i] - 128;
-      normalizedTimeDomain[i] = Math.round(128 + deviation * scale);
+      normalizedTimeDomainBuffer[i] = (128 + deviation * scale) | 0; // Bitwise floor
     }
   }
 
   // Get frequency data for spectrum visualizers
-  let frequencyData = [];
   if (state.analyser && state.frequencyData) {
     state.analyser.getByteFrequencyData(state.frequencyData);
-    frequencyData = Array.from(state.frequencyData);
+    // Initialize buffer once
+    if (!frequencyDataBuffer || frequencyDataBuffer.length !== state.frequencyData.length) {
+      frequencyDataBuffer = new Array(state.frequencyData.length);
+    }
+    // Copy without creating new array
+    for (let i = 0; i < state.frequencyData.length; i++) {
+      frequencyDataBuffer[i] = state.frequencyData[i];
+    }
   }
 
-  const data = {
-    type: 'audio',
-    volume,
-    normalizedVolume,
-    avgVolume,
-    beat,
-    timeDomainData: normalizedTimeDomain,
-    frequencyData: frequencyData,
-    timestamp: performance.now()
-  };
+  // Update reusable data object
+  broadcastData.volume = volume;
+  broadcastData.normalizedVolume = normalizedVolume;
+  broadcastData.avgVolume = avgVolume;
+  broadcastData.beat = beat;
+  broadcastData.timeDomainData = normalizedTimeDomainBuffer;
+  broadcastData.frequencyData = frequencyDataBuffer;
+  broadcastData.timestamp = performance.now();
 
-  state.virtualWindows.forEach(win => {
+  // Use for loop instead of forEach for better performance
+  const windows = state.virtualWindows;
+  for (let i = 0; i < windows.length; i++) {
     try {
-      win.iframe.contentWindow.postMessage(data, '*');
+      windows[i].iframe.contentWindow.postMessage(broadcastData, '*');
     } catch (e) {
       // Iframe might not be ready
     }
-  });
+  }
 }
