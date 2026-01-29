@@ -304,6 +304,7 @@ button:active {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  user-select: none;
 }
 
 .win98-buttons {

@@ -299,18 +299,20 @@ export function createVirtualWindowWithProject(project) {
   const buttons = document.createElement('div');
   buttons.className = 'win98-buttons';
 
-  const maximizeButton = document.createElement('button');
-  maximizeButton.className = 'win98-btn win98-btn-maximize';
-  maximizeButton.onclick = (e) => {
-    e.stopPropagation();
-    toggleMaximize(id);
-  };
-
   const closeButton = document.createElement('button');
   closeButton.className = 'win98-btn win98-btn-close';
   closeButton.onclick = () => closeVirtualWindow(id);
 
-  buttons.appendChild(maximizeButton);
+  // Add maximize button only for projects that support it
+  if (project !== 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz') {
+    const maximizeButton = document.createElement('button');
+    maximizeButton.className = 'win98-btn win98-btn-maximize';
+    maximizeButton.onclick = (e) => {
+      e.stopPropagation();
+      toggleMaximize(id);
+    };
+    buttons.appendChild(maximizeButton);
+  }
   buttons.appendChild(closeButton);
   titleBar.appendChild(title);
   titleBar.appendChild(buttons);
