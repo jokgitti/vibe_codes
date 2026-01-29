@@ -12,7 +12,10 @@ export const CONFIG = {
 
   // Limits
   MAX_WINDOWS: 35,
-  MAX_PER_PROJECT: 7,
+  MAX_PER_PROJECT: 7, // Default max per project
+  PROJECT_LIMITS: {
+    'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz': 5 // Heavy to render
+  },
 
   // Audio
   FFT_SIZE: 512,

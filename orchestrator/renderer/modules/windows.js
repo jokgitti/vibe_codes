@@ -249,8 +249,13 @@ function getCenterBurstPosition() {
 // WINDOW CREATION & DESTRUCTION
 // =============================================================================
 
+// Get max windows allowed for a specific project
+function getProjectLimit(project) {
+  return CONFIG.PROJECT_LIMITS?.[project] ?? CONFIG.MAX_PER_PROJECT;
+}
+
 export function getRandomProject() {
-  const available = PROJECTS.filter(p => state.projectCounts[p] < CONFIG.MAX_PER_PROJECT);
+  const available = PROJECTS.filter(p => state.projectCounts[p] < getProjectLimit(p));
   if (available.length === 0) return null;
   return available[Math.floor(Math.random() * available.length)];
 }
@@ -272,7 +277,8 @@ export function createVirtualWindowWithProject(project) {
     return null;
   }
 
-  if (state.projectCounts[project] >= CONFIG.MAX_PER_PROJECT) {
+  const projectLimit = getProjectLimit(project);
+  if (state.projectCounts[project] >= projectLimit) {
     setStatus(`max ${project} windows reached`);
     return null;
   }
