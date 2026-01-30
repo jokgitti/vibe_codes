@@ -393,7 +393,6 @@ export function closeVirtualWindow(id) {
 }
 
 export function closeOldestWindow() {
-  if (state.virtualWindows.length < CONFIG.MIN_WINDOWS_TO_CLOSE) return;
   if (state.virtualWindows.length === 0) return;
 
   closeVirtualWindow(state.virtualWindows[0].id);

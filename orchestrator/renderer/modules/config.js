@@ -36,7 +36,6 @@ export const CONFIG = {
 
   // Close detection
   CLOSE_COOLDOWN: 800,
-  MIN_WINDOWS_TO_CLOSE: 3,
 
   // Audio broadcast (30fps = 33ms interval)
   BROADCAST_INTERVAL: 33,

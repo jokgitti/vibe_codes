@@ -80,9 +80,9 @@ Opens a new window when:
 ### Window Close Logic
 
 Closes oldest window when:
-- Volume drops to < 40% of average (quiet moment)
-- Cooldown of 800ms has passed since last close
-- Window count >= 3 (minimum to allow closing)
+- Volume drops to < 40% of average (relative quiet) OR volume below minimum threshold (absolute quiet)
+- Adaptive cooldown has passed (800ms at moderate quiet, down to 100ms at total silence)
+- At least one window is open
 
 ### Positioning Patterns
 
@@ -107,8 +107,7 @@ Parameters in `renderer/renderer.js`:
 | `BEAT_THRESHOLD_BASE` | 1.25 | Base volume spike multiplier |
 | `BEAT_COOLDOWN` | 300ms | Time between window opens |
 | `MIN_VOLUME_BASE` | 5 | Base minimum volume to trigger |
-| `CLOSE_COOLDOWN` | 800ms | Time between closes |
-| `MIN_WINDOWS_TO_CLOSE` | 3 | Minimum windows before closing |
+| `CLOSE_COOLDOWN` | 800ms | Base time between closes (adaptive based on quietness) |
 
 ### Sensitivity Slider
 

@@ -417,17 +417,27 @@ function analyzeLoop(currentTime) {
   }
 
   // Close on quiet (only when auto-open is enabled)
+  // Two conditions: relative drop (volume < avgVolume * 0.4) OR absolute silence (volume < minVol)
   const timeSinceClose = currentTime - state.lastCloseTime;
-  if (state.autoOpenEnabled &&
-      volume < avgVolume * 0.4 &&
-      avgVolume > getMinVolume() &&
-      timeSinceClose > CONFIG.CLOSE_COOLDOWN &&
-      state.virtualWindows.length >= CONFIG.MIN_WINDOWS_TO_CLOSE) {
+  const isRelativelyQuiet = volume < avgVolume * 0.4 && avgVolume > 0;
+  const isAbsolutelyQuiet = volume < getMinVolume();
 
-    state.lastCloseTime = currentTime;
-    closeOldestWindow();
-    setStatus('quiet - closing window...');
-    setTimeout(() => setStatus(state.autoOpenEnabled ? 'auto-open on' : 'auto-open off'), 500);
+  if (state.autoOpenEnabled &&
+      (isRelativelyQuiet || isAbsolutelyQuiet) &&
+      state.virtualWindows.length > 0) {
+
+    // Adaptive cooldown: quieter = faster closing
+    // Scale cooldown from 800ms (moderate quiet) down to 100ms (total silence)
+    const minVol = getMinVolume();
+    const quietness = Math.max(0, Math.min(1, 1 - (volume / Math.max(minVol, 1))));
+    const adaptiveCooldown = CONFIG.CLOSE_COOLDOWN * (1 - quietness * 0.875); // 800ms -> 100ms
+
+    if (timeSinceClose > adaptiveCooldown) {
+      state.lastCloseTime = currentTime;
+      closeOldestWindow();
+      setStatus('quiet - closing window...');
+      setTimeout(() => setStatus(state.autoOpenEnabled ? 'auto-open on' : 'auto-open off'), 500);
+    }
   }
 
   // Broadcast audio to iframes (throttled to 30fps)
