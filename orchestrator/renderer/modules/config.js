@@ -52,5 +52,6 @@ export const PROJECTS = [
   'lucid_dream',
   'pitchy_soundwave',
   'rotating_gliph',
-  'tlkn_2_mslf'
+  'tlkn_2_mslf',
+  'rotating_wireframe'
 ];
