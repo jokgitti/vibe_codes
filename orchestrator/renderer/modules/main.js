@@ -2,7 +2,7 @@
 // ORCHESTRATOR v2 - MAIN ENTRY POINT
 // =============================================================================
 
-import { CONFIG } from './config.js';
+import { CONFIG, PROJECTS } from './config.js';
 import { state } from './state.js';
 import { initAudio, getVolume, getAverageVolume, getBeatThreshold, getMinVolume, broadcastAudioData } from './audio.js';
 import { setPlaybackCallbacks, loadAudioFile, unloadAudioFile, playAudio, pauseAudio, stopAudio, seekRelative, setRepeat, isRepeatEnabled, isAudioFileLoaded, isAudioPlaying, getAudioTime, getAudioDuration } from './playback.js';
@@ -17,7 +17,7 @@ import { initDrag, makeDraggable } from './drag.js';
 // DOM ELEMENTS (for event handlers)
 // =============================================================================
 
-let sensitivitySlider, sensitivityValue, patternSelect;
+let sensitivitySlider, sensitivityValue, patternSelect, projectFilterSelect;
 let controlPanelWindow, controlPanelTitlebar, controlPanelClose;
 let bpmValueEl;
 
@@ -34,6 +34,7 @@ function initDOMElements() {
   sensitivitySlider = document.getElementById('sensitivitySlider');
   sensitivityValue = document.getElementById('sensitivityValue');
   patternSelect = document.getElementById('patternSelect');
+  projectFilterSelect = document.getElementById('projectFilterSelect');
   controlPanelWindow = document.getElementById('controlPanelWindow');
   controlPanelTitlebar = document.getElementById('controlPanelTitlebar');
   controlPanelClose = document.getElementById('controlPanelClose');
@@ -70,6 +71,14 @@ function initControlPanel() {
   // Close button hides the panel
   controlPanelClose.addEventListener('click', () => {
     hideControlPanel();
+  });
+
+  // Populate project filter select
+  PROJECTS.forEach(project => {
+    const option = document.createElement('option');
+    option.value = project;
+    option.textContent = project;
+    projectFilterSelect.appendChild(option);
   });
 }
 
@@ -285,6 +294,10 @@ function initEventHandlers() {
   patternSelect.addEventListener('change', (e) => {
     state.currentPattern = e.target.value;
     recalculateGrid();
+  });
+
+  projectFilterSelect.addEventListener('change', (e) => {
+    state.projectFilter = e.target.value;
   });
 
   window.addEventListener('resize', () => {

@@ -255,7 +255,18 @@ function getProjectLimit(project) {
 }
 
 export function getRandomProject() {
-  const available = PROJECTS.filter(p => state.projectCounts[p] < getProjectLimit(p));
+  // Filter by project filter setting
+  let projectsToConsider = PROJECTS;
+  if (state.projectFilter !== 'all') {
+    projectsToConsider = [state.projectFilter];
+  }
+
+  // When a single project is selected, skip per-project limits (only MAX_WINDOWS applies)
+  if (state.projectFilter !== 'all') {
+    return projectsToConsider[0];
+  }
+
+  const available = projectsToConsider.filter(p => state.projectCounts[p] < getProjectLimit(p));
   if (available.length === 0) return null;
   return available[Math.floor(Math.random() * available.length)];
 }
@@ -268,19 +279,24 @@ export function createVirtualWindow() {
   const project = getRandomProject();
   if (!project) return null;
 
-  return createVirtualWindowWithProject(project);
+  // Skip per-project limit check when a single project filter is active
+  const skipProjectLimit = state.projectFilter !== 'all';
+  return createVirtualWindowWithProject(project, 'random', skipProjectLimit);
 }
 
-export function createVirtualWindowWithProject(project, asset = 'random') {
+export function createVirtualWindowWithProject(project, asset = 'random', skipProjectLimit = false) {
   if (state.virtualWindows.length >= CONFIG.MAX_WINDOWS) {
     setStatus('max windows reached');
     return null;
   }
 
-  const projectLimit = getProjectLimit(project);
-  if (state.projectCounts[project] >= projectLimit) {
-    setStatus(`max ${project} windows reached`);
-    return null;
+  // Skip per-project limit check when explicitly requested (single project filter)
+  if (!skipProjectLimit) {
+    const projectLimit = getProjectLimit(project);
+    if (state.projectCounts[project] >= projectLimit) {
+      setStatus(`max ${project} windows reached`);
+      return null;
+    }
   }
 
   const { x, y, gridIndex } = getNextPosition();

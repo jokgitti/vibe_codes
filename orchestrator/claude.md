@@ -76,6 +76,11 @@ Opens a new window when:
 - Current volume > average × threshold (adjusted by sensitivity slider)
 - Minimum volume threshold met (adjusted by sensitivity slider)
 - Cooldown of 300ms has passed since last open
+- Auto-open is enabled (Cmd+S)
+
+The **auto-open project filter** controls which projects can be opened automatically:
+- **all** (default): Randomly selects from all available projects, respecting per-project limits
+- **specific project**: Only opens the selected project type, ignoring per-project limits (only MAX_WINDOWS applies)
 
 ### Window Close Logic
 
@@ -187,6 +192,7 @@ Auto-opened windows (triggered by audio) always use random asset selection.
 - **BPM display**: Shows calculated tempo from detected beats (averages last 8 beats)
 - **Sensitivity slider**: Adjust beat detection sensitivity
 - **Pattern dropdown**: Select window positioning pattern
+- **Auto-open project dropdown**: Filter which project types can be auto-opened (default: all)
 
 ## Windows 98 Style
 

@@ -33,6 +33,9 @@ export const state = {
   // Pattern
   currentPattern: 'random',
 
+  // Project filter (for auto-open)
+  projectFilter: 'all',
+
   // Auto-open mode (toggled with Cmd+S)
   autoOpenEnabled: false,
 
