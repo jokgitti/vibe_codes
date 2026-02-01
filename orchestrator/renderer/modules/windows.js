@@ -271,7 +271,7 @@ export function createVirtualWindow() {
   return createVirtualWindowWithProject(project);
 }
 
-export function createVirtualWindowWithProject(project) {
+export function createVirtualWindowWithProject(project, asset = 'random') {
   if (state.virtualWindows.length >= CONFIG.MAX_WINDOWS) {
     setStatus('max windows reached');
     return null;
@@ -328,7 +328,15 @@ export function createVirtualWindowWithProject(project) {
   content.className = 'win98-content';
 
   const iframe = document.createElement('iframe');
-  iframe.src = `../../${project}/index.html`;
+
+  // Build URL with asset parameter if specified
+  let url = `../../${project}/index.html`;
+  if (asset && asset !== 'random') {
+    const paramName = project === 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz' ? 'image' : 'shape';
+    url += `?${paramName}=${encodeURIComponent(asset)}`;
+  }
+
+  iframe.src = url;
   iframe.allow = 'microphone'; // Allow microphone for standalone mode
 
   content.appendChild(iframe);

@@ -78,7 +78,16 @@
           </div>
         </div>
         <div class="modal-content">
-          <select id="projectSelect"></select>
+          <div class="project-select-container">
+            <label class="label" for="projectSelect">project:</label>
+            <select id="projectSelect"></select>
+          </div>
+          <div id="assetSelectContainer" class="asset-select-container hidden">
+            <label class="label" for="assetSelect">asset:</label>
+            <select id="assetSelect">
+              <option value="random">random</option>
+            </select>
+          </div>
         </div>
         <div class="modal-buttons">
           <button id="modalOpenBtn">open</button>

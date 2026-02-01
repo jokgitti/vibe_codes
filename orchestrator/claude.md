@@ -143,14 +143,45 @@ npm start
 ## Available Projects
 
 The orchestrator randomly selects from:
+- `draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz` - ASCII art display (audio-reactive line opacity)
 - `circling_cycle` - Text animation along SVG paths (audio-reactive highlight speed)
 - `lucid_dream` - Slot-machine style letter display (audio-reactive brightness)
 - `pitchy_soundwave` - Microphone waveform visualizer
 - `rotating_gliph` - Audio-reactive 3D dodecahedron
+- `rotating_wireframe` - 3D wireframe model renderer
 - `tlkn_2_mslf` - Auto-playing base64 chat (audio-reactive message timing)
+
+### Projects with Asset Selection
+
+Some projects support selecting specific assets instead of random selection:
+
+**draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz** (`gallery.json`):
+- Displays ASCII art versions of images (static or animated GIFs)
+- Assets: cell-tower variants, dancing-miku, earth (animated), etc.
+- URL parameter: `?image=<id>` (e.g., `?image=earth`)
+
+**circling_cycle** (`shapes.json`):
+- Text flowing along geometric SVG paths
+- Assets: circle, s-shape, figure8, heart, star
+- URL parameter: `?shape=<id>` (e.g., `?shape=heart`)
+
+### Manual Project Opening
+
+Press `Cmd+O` (macOS) or `Ctrl+O` (Windows/Linux) to open the project selection modal:
+
+1. **Project dropdown**: Select which project to open
+2. **Asset dropdown**: For projects with assets, choose a specific asset or "random" (default)
+   - Only appears for projects that support asset selection
+   - Defaults to "random" for auto-opened windows
+3. Click "open" to create the window
+
+Auto-opened windows (triggered by audio) always use random asset selection.
 
 ## Controls
 
+- **Cmd+I**: Toggle control panel visibility
+- **Cmd+O**: Open project selection modal
+- **Cmd+S**: Toggle auto-open windows (vibe mode)
 - **Windows bar**: Shows current/max windows
 - **Audio bar**: Shows current audio level
 - **BPM display**: Shows calculated tempo from detected beats (averages last 8 beats)

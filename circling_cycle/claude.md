@@ -11,18 +11,46 @@ An animated visualization that displays repeating words flowing along SVG paths,
 
 ## How It Works
 
+### Asset Loading
+
+Shapes and words are loaded from `shapes.json`, a declarative asset file:
+
+```json
+{
+  "shapes": [
+    { "id": "circle", "name": "circle", "path": "..." },
+    { "id": "heart", "name": "heart", "path": "..." },
+    ...
+  ],
+  "words": ["love", "star", "dream", ...]
+}
+```
+
+This allows easy asset management - add new shapes or words by updating the JSON file.
+
 ### Path System
 
 Characters are positioned along SVG paths using the SVG DOM API:
 - `getTotalLength()` - gets the path's total length
 - `getPointAtLength(distance)` - gets x,y coordinates at any point along the path
 
-Available shapes (one selected randomly at startup):
+Available shapes (loaded from `shapes.json`):
 - Circle
 - S-shape
 - Figure 8
 - Heart
 - Star (5-point)
+
+### Shape Selection
+
+Shapes can be selected in two ways:
+
+1. **Random** (default): A random shape is selected at startup
+2. **URL parameter**: `?shape=<id>` to load a specific shape
+   - Example: `index.html?shape=heart` loads the heart shape
+   - If the specified shape ID doesn't exist, falls back to random
+
+When running in the orchestrator, shapes can be selected manually via the asset dropdown.
 
 ### Text Generation
 
@@ -107,8 +135,23 @@ light, music, heart, sweet, brave, free, wild, calm, joy, glow
 - Delta time is used for frame-rate independent animation
 - Audio analysis runs every frame, speed updates throttled to 100ms
 
+## Project Structure
+
+```
+circling_cycle/
+├── index.html      # Main visualization
+├── shapes.json     # Declarative shape and word assets
+└── claude.md       # This file
+```
+
 ## Running the App
 
 Simply open `index.html` in a browser. For microphone access, use:
 - `file://` protocol (works in most browsers)
 - Or serve via local server: `python3 -m http.server 8000`
+
+To test with a specific shape:
+```
+index.html?shape=heart
+index.html?shape=star
+```

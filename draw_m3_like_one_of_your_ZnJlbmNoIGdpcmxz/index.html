@@ -84,8 +84,22 @@
           throw new Error('no images in gallery');
         }
 
-        // Pick a random image from the gallery
-        currentImage = gallery.images[Math.floor(Math.random() * gallery.images.length)];
+        // Check for URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const imageId = urlParams.get('image');
+
+        if (imageId) {
+          // Find specific image by ID
+          currentImage = gallery.images.find(img => img.id === imageId);
+          if (!currentImage) {
+            console.warn(`Image '${imageId}' not found, selecting random`);
+            currentImage = gallery.images[Math.floor(Math.random() * gallery.images.length)];
+          }
+        } else {
+          // Pick a random image from the gallery
+          currentImage = gallery.images[Math.floor(Math.random() * gallery.images.length)];
+        }
+
         return currentImage;
       } catch (err) {
         container.innerHTML = `<div class="error">failed to load: ${err.message}</div>`;

@@ -82,33 +82,14 @@
     let lastSpeedUpdate = 0;
     let mediaStream = null;
 
-    // Word list (20 words, max 6 characters)
-    const words = [
-      'love', 'star', 'dream', 'hope', 'shine',
-      'peace', 'happy', 'smile', 'dance', 'magic',
-      'light', 'music', 'heart', 'sweet', 'brave',
-      'free', 'wild', 'calm', 'joy', 'glow'
-    ];
+    // Gallery data (loaded from gallery.json)
+    let gallery = null;
+    let shapes = [];
+    let words = [];
 
-    // Example paths - change the 'd' attribute of #text-path to use different shapes
-    const paths = {
-      // Circle (radius 200)
-      circle: 'M 0,-200 C 110,-200 200,-110 200,0 C 200,110 110,200 0,200 C -110,200 -200,110 -200,0 C -200,-110 -110,-200 0,-200',
-      // S-shape
-      sShape: 'M 0,-200 C 160,-200 160,0 0,0 C -160,0 -160,200 0,200',
-      // Figure 8
-      figure8: 'M 0,0 C 100,-100 200,-100 200,0 C 200,100 100,100 0,0 C -100,-100 -200,-100 -200,0 C -200,100 -100,100 0,0',
-      // Heart
-      heart: 'M 0,-130 C 60,-190 160,-130 160,-30 C 160,70 80,130 0,190 C -80,130 -160,70 -160,-30 C -160,-130 -60,-190 0,-130',
-      // Star (5 points)
-      star: 'M 0,-200 L 44,-70 L 190,-70 L 70,20 L 118,150 L 0,70 L -118,150 L -70,20 L -190,-70 L -44,-70 Z',
-    };
-
-    // Get array of path keys for random selection
-    const pathKeys = Object.keys(paths);
-
-    // Set initial path
-    pathElement.setAttribute('d', paths.heart);
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const shapeParam = urlParams.get('shape'); // specific shape ID or null for random
 
     // State
     let pathOffset = 0;
@@ -142,12 +123,45 @@
       }
     }
 
-    // Randomly select shape and word (called once at startup)
+    // Load shapes from JSON
+    async function loadGallery() {
+      try {
+        const response = await fetch('shapes.json');
+        if (!response.ok) throw new Error('shapes.json not found');
+
+        gallery = await response.json();
+        shapes = gallery.shapes;
+        words = gallery.words;
+        return true;
+      } catch (err) {
+        console.error('Failed to load shapes:', err);
+        return false;
+      }
+    }
+
+    // Select shape and word (called once at startup after gallery is loaded)
     function selectShapeAndWord() {
-      const randomPathKey = pathKeys[Math.floor(Math.random() * pathKeys.length)];
+      if (!gallery || shapes.length === 0 || words.length === 0) {
+        console.error('Gallery not loaded');
+        return;
+      }
+
+      // Select shape (specific or random)
+      let selectedShape;
+      if (shapeParam) {
+        selectedShape = shapes.find(s => s.id === shapeParam);
+        if (!selectedShape) {
+          console.warn(`Shape '${shapeParam}' not found, selecting random`);
+          selectedShape = shapes[Math.floor(Math.random() * shapes.length)];
+        }
+      } else {
+        selectedShape = shapes[Math.floor(Math.random() * shapes.length)];
+      }
+
+      // Select random word
       const randomWord = words[Math.floor(Math.random() * words.length)];
 
-      pathElement.setAttribute('d', paths[randomPathKey]);
+      pathElement.setAttribute('d', selectedShape.path);
       config.targetWord = randomWord;
       pathLength = pathElement.getTotalLength();
       buildPathCache(); // Pre-compute path points
@@ -335,10 +349,15 @@
     window.addEventListener('resize', setupCanvas);
 
     // Initialize
-    setupCanvas();
-    selectShapeAndWord();  // Pick random shape and word once at startup
-    initAudio();           // Initialize microphone for audio-reactive speed
-    requestAnimationFrame(render);
+    async function init() {
+      setupCanvas();
+      await loadGallery();    // Load gallery first
+      selectShapeAndWord();   // Pick shape and word from gallery
+      initAudio();            // Initialize microphone for audio-reactive speed
+      requestAnimationFrame(render);
+    }
+
+    init();
   </script>
 </body>
 </html>
