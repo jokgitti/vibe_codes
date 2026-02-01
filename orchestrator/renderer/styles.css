@@ -401,13 +401,21 @@ button:active {
   padding: 15px;
 }
 
-.modal-content select {
-  width: 100%;
-  padding: 4px;
-  font-size: 12px;
-  font-family: inherit;
-  background: #fff;
-  border: 2px inset #808080;
+.project-select-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.asset-select-container {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.asset-select-container.hidden {
+  display: none;
 }
 
 .modal-buttons {
