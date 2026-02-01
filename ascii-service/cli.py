@@ -25,14 +25,28 @@ def is_animated_gif(filepath):
         return False
 
 
-def extract_gif_frames(filepath, columns):
-    """Extract all frames from a GIF and convert each to ASCII."""
+def extract_gif_frames(filepath, columns, max_frames=None):
+    """Extract frames from a GIF and convert each to ASCII.
+
+    Args:
+        filepath: Path to GIF file
+        columns: Width in characters
+        max_frames: Maximum number of frames to extract (samples evenly if less than total)
+    """
     frames = []
     with Image.open(filepath) as img:
         n_frames = img.n_frames
-        print(f"Extracting {n_frames} frames...", file=__import__("sys").stderr)
 
-        for i in range(n_frames):
+        # Determine which frames to extract
+        if max_frames and max_frames < n_frames:
+            # Sample frames evenly
+            frame_indices = [int(i * n_frames / max_frames) for i in range(max_frames)]
+            print(f"Extracting {max_frames} frames (sampled from {n_frames})...", file=__import__("sys").stderr)
+        else:
+            frame_indices = range(n_frames)
+            print(f"Extracting {n_frames} frames...", file=__import__("sys").stderr)
+
+        for i in frame_indices:
             img.seek(i)
             # Convert to RGB (GIF frames may be palette mode)
             frame = img.convert("RGB")
@@ -63,6 +77,11 @@ Examples:
     parser.add_argument("--url", help="Image URL (alternative to file)")
     parser.add_argument(
         "--columns", "-c", type=int, default=80, help="Width in characters (default: 80)"
+    )
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        help="Maximum frames to extract from GIF (samples evenly if less than total)",
     )
     parser.add_argument(
         "--mode",
@@ -119,7 +138,7 @@ Examples:
 
         if is_gif:
             # Extract all GIF frames
-            frames = extract_gif_frames(args.file, args.columns)
+            frames = extract_gif_frames(args.file, args.columns, args.max_frames)
             entry = {
                 "id": image_id,
                 "source": source,
@@ -160,7 +179,7 @@ Examples:
     else:
         if is_gif:
             # For terminal mode, just show first frame
-            frames = extract_gif_frames(args.file, args.columns)
+            frames = extract_gif_frames(args.file, args.columns, args.max_frames)
             print("\n".join(frames[0]))
         else:
             print(art.to_ascii(columns=args.columns, monochrome=True))
