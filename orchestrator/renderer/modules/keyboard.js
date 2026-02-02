@@ -23,10 +23,6 @@ export function isFilePickerVisible() {
   return filePickerOverlay && filePickerOverlay.classList.contains('visible');
 }
 
-export function showControlPanel() {
-  controlPanelWindow.classList.remove('hidden');
-}
-
 export function hideControlPanel() {
   controlPanelWindow.classList.add('hidden');
 }

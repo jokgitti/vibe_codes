@@ -23,8 +23,6 @@ export const CONFIG = {
   VOLUME_HISTORY_SIZE: 30,
 
   // Beat detection (base values, adjusted by sensitivity)
-  // Time-domain volume typically ranges 0-30
-  BEAT_THRESHOLD_BASE: 1.3,
   BEAT_COOLDOWN: 300,
   MIN_VOLUME_BASE: 2,
 

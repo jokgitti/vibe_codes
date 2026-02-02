@@ -46,8 +46,8 @@ export function getAverageVolume() {
   return state.volumeHistory.reduce((a, b) => a + b, 0) / state.volumeHistory.length;
 }
 
-export function getBeatThreshold() {
-  return 1.0 + (CONFIG.BEAT_THRESHOLD_BASE - 1.0) / state.sensitivity;
+export function getOnsetThreshold() {
+  return CONFIG.ONSET_THRESHOLD_BASE / state.sensitivity;
 }
 
 export function getMinVolume() {
@@ -133,7 +133,7 @@ export function broadcastAudioData(volume, beat) {
   for (let i = 0; i < windows.length; i++) {
     try {
       windows[i].iframe.contentWindow.postMessage(broadcastData, '*');
-    } catch (e) {
+    } catch (_e) {
       // Iframe might not be ready
     }
   }

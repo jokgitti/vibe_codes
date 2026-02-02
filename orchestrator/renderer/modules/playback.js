@@ -64,7 +64,6 @@ function parseID3v2(view) {
     : { TIT2: 'title', TPE1: 'artist', TALB: 'album' };
 
   const frameIdLength = version === 2 ? 3 : 4;
-  const frameSizeLength = version === 2 ? 3 : 4;
   const frameHeaderSize = version === 2 ? 6 : 10;
 
   while (offset + frameHeaderSize < end) {
@@ -235,7 +234,7 @@ export function unloadAudioFile() {
   if (state.analyser) {
     try {
       state.analyser.disconnect(state.audioContext.destination);
-    } catch (e) {
+    } catch (_e) {
       // May not be connected
     }
   }

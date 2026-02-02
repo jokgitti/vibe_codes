@@ -105,19 +105,19 @@ Parameters in `renderer/renderer.js`:
 
 | Parameter | Default | Effect |
 |-----------|---------|--------|
-| `WINDOW_WIDTH` | 350 | Virtual window width |
-| `WINDOW_HEIGHT` | 350 | Virtual window height |
-| `MAX_WINDOWS` | 50 | Maximum windows (much higher now!) |
-| `MAX_PER_PROJECT` | 15 | Maximum windows per project |
-| `BEAT_THRESHOLD_BASE` | 1.25 | Base volume spike multiplier |
+| `WINDOW_WIDTH` | 400 | Virtual window width |
+| `WINDOW_HEIGHT` | 400 | Virtual window height |
+| `MAX_WINDOWS` | 35 | Maximum virtual windows |
+| `MAX_PER_PROJECT` | 7 | Default max windows per project |
+| `ONSET_THRESHOLD_BASE` | 8 | Base onset detection threshold |
 | `BEAT_COOLDOWN` | 300ms | Time between window opens |
-| `MIN_VOLUME_BASE` | 5 | Base minimum volume to trigger |
+| `MIN_VOLUME_BASE` | 2 | Base minimum volume to trigger |
 | `CLOSE_COOLDOWN` | 800ms | Base time between closes (adaptive based on quietness) |
 
 ### Sensitivity Slider
 
 The UI has a sensitivity slider (0.5x to 2.0x) that adjusts:
-- Beat threshold: `1.0 + (BEAT_THRESHOLD_BASE - 1.0) / sensitivity`
+- Onset threshold: `ONSET_THRESHOLD_BASE / sensitivity`
 - Minimum volume: `MIN_VOLUME_BASE / sensitivity`
 
 Higher sensitivity = triggers more easily.
@@ -153,6 +153,32 @@ cd orchestrator
 npm install
 npm start
 ```
+
+## Code Quality
+
+ESLint and Prettier are configured for this project.
+
+### Linting
+
+Run ESLint to check for code issues:
+
+```bash
+npm run lint        # Check for issues
+npm run lint:fix    # Auto-fix issues
+```
+
+### Formatting
+
+Run Prettier to format code:
+
+```bash
+npm run format        # Format all files
+npm run format:check  # Check formatting without changing files
+```
+
+### Before Major Changes
+
+**Always run `npm run lint` before committing major changes** to catch potential issues early. This helps maintain code quality and consistency across the project.
 
 ## Available Projects
 

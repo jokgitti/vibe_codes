@@ -102,9 +102,3 @@ export function calculateDrawMeDimensions(imageId, maxWidth, maxHeight) {
   };
 }
 
-/**
- * Check if gallery is loaded
- */
-export function isGalleryLoaded() {
-  return galleryLoaded;
-}

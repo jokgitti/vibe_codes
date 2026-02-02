@@ -4,11 +4,11 @@
 
 import { CONFIG, PROJECTS } from './config.js';
 import { state } from './state.js';
-import { initAudio, getVolume, getAverageVolume, getBeatThreshold, getMinVolume, broadcastAudioData } from './audio.js';
-import { setPlaybackCallbacks, loadAudioFile, unloadAudioFile, playAudio, pauseAudio, stopAudio, seekRelative, setRepeat, isRepeatEnabled, isAudioFileLoaded, isAudioPlaying, getAudioTime, getAudioDuration } from './playback.js';
+import { initAudio, getVolume, getAverageVolume, getOnsetThreshold, getMinVolume, broadcastAudioData } from './audio.js';
+import { setPlaybackCallbacks, loadAudioFile, unloadAudioFile, playAudio, pauseAudio, stopAudio, seekRelative, setRepeat, isRepeatEnabled, isAudioPlaying, getAudioTime, getAudioDuration } from './playback.js';
 import { initUI, updateUI, setStatus } from './ui.js';
 import { initTitleElements, initTitleAnimation } from './title.js';
-import { initWindowContainer, recalculateGrid, createVirtualWindow, closeOldestWindow, closeVirtualWindow } from './windows.js';
+import { initWindowContainer, recalculateGrid, createVirtualWindow, closeOldestWindow } from './windows.js';
 import { initModal } from './modal.js';
 import { initKeyboard, hideControlPanel } from './keyboard.js';
 import { initDrag, makeDraggable } from './drag.js';
@@ -408,9 +408,8 @@ function analyzeLoop(currentTime) {
   state.cachedRecentAvg = recentAvg;
 
   const onset = volume - recentAvg;
-  const onsetThreshold = CONFIG.ONSET_THRESHOLD_BASE / state.sensitivity;
 
-  if (onset > onsetThreshold &&
+  if (onset > getOnsetThreshold() &&
       timeSinceBeat > CONFIG.BEAT_COOLDOWN &&
       volume > getMinVolume()) {
 
