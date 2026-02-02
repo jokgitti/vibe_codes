@@ -6,6 +6,7 @@ import { CONFIG, PROJECTS } from './config.js';
 import { state } from './state.js';
 import { updateUI, setStatus } from './ui.js';
 import { makeDraggable, bringToFront } from './drag.js';
+import { calculateDrawMeDimensions } from './gallery.js';
 
 let windowContainer;
 
@@ -302,13 +303,33 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
   const { x, y, gridIndex } = getNextPosition();
   const id = state.windowIdCounter++;
 
-  // Create window element
+  // Calculate max constraints for content
+  const maxWidth = windowContainer.clientWidth - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
+  const maxHeight = windowContainer.clientHeight - CONFIG.TITLEBAR_HEIGHT - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
+
+  // Pre-calculate dimensions for draw_me project
+  let contentWidth = CONFIG.WINDOW_WIDTH;
+  let contentHeight = CONFIG.WINDOW_HEIGHT;
+  let resolvedAsset = asset;
+  let drawMeImageData = null;
+
+  if (project === 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz') {
+    const dims = calculateDrawMeDimensions(asset, maxWidth, maxHeight);
+    if (dims) {
+      contentWidth = dims.width;
+      contentHeight = dims.height;
+      resolvedAsset = dims.imageId;
+      drawMeImageData = dims.imageData; // Store for passing to iframe
+    }
+  }
+
+  // Create window element with correct size from the start
   const windowEl = document.createElement('div');
   windowEl.className = 'win98-window spawning';
   windowEl.style.left = `${x}px`;
   windowEl.style.top = `${y}px`;
-  windowEl.style.width = `${CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING}px`;
-  windowEl.style.height = `${CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING}px`;
+  windowEl.style.width = `${contentWidth + CONFIG.CHROME_PADDING}px`;
+  windowEl.style.height = `${contentHeight + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING}px`;
 
   // Title bar
   const titleBar = document.createElement('div');
@@ -339,15 +360,20 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
   titleBar.appendChild(title);
   titleBar.appendChild(buttons);
 
-  // Content area with iframe
+  // Content area with iframe - set size explicitly
   const content = document.createElement('div');
   content.className = 'win98-content';
+  content.style.width = `${contentWidth}px`;
+  content.style.height = `${contentHeight}px`;
 
   const iframe = document.createElement('iframe');
 
-  // Build URL with asset parameter if specified
+  // Build URL with asset parameter - always pass resolved asset for draw_me
   let url = `../../${project}/index.html`;
-  if (asset && asset !== 'random') {
+  if (project === 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz' && resolvedAsset) {
+    // Always pass the image ID so draw_me loads the same image we calculated
+    url += `?image=${encodeURIComponent(resolvedAsset)}`;
+  } else if (asset && asset !== 'random') {
     const paramName = project === 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz' ? 'image' : 'shape';
     url += `?${paramName}=${encodeURIComponent(asset)}`;
   }
@@ -377,13 +403,16 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
 
   // Send init message with max dimensions when iframe loads
   iframe.addEventListener('load', () => {
-    const maxWidth = windowContainer.clientWidth - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
-    const maxHeight = windowContainer.clientHeight - CONFIG.TITLEBAR_HEIGHT - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
-    iframe.contentWindow.postMessage({
+    const initMessage = {
       type: 'init',
       maxWidth,
       maxHeight
-    }, '*');
+    };
+    // Include pre-loaded image data for draw_me to avoid duplicate fetch
+    if (drawMeImageData) {
+      initMessage.imageData = drawMeImageData;
+    }
+    iframe.contentWindow.postMessage(initMessage, '*');
   });
 
   // Remove spawning class after animation

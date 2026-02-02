@@ -5,16 +5,25 @@ An audio-reactive ASCII art visualizer that displays an image as ASCII character
 ## Overview
 
 - **Visual**: ASCII art representation of an image, each line with independent opacity
-- **Technology**: Fetches ASCII from ascii-service, Web Audio API for audio reactivity
+- **Technology**: Canvas-based rendering, Web Audio API for audio reactivity
 - **Animation**: Line opacities ripple based on time-domain audio data
 
 ## How It Works
 
 ### ASCII Loading
 
-1. Calls the `ascii-service` API with an image URL
-2. Receives plain text ASCII art
-3. Splits into lines, each rendered as a separate DOM element
+ASCII art is pre-generated and stored in `gallery.json`:
+- **Standalone mode**: Fetches `gallery.json` and selects image by URL parameter or random
+- **Orchestrator mode**: Receives image data directly via `postMessage` (no fetch needed, instant render)
+
+### Canvas Rendering
+
+All lines are rendered to a single `<canvas>` element in one pass per frame:
+- Uses `ctx.fillText()` with varying `rgba()` alpha values per line
+- Device pixel ratio scaling for sharp text on retina displays
+- Debounced rendering via `requestAnimationFrame`
+
+This is significantly faster than DOM-based rendering (which would require N style mutations per frame).
 
 ### Audio Reactivity
 
@@ -46,34 +55,41 @@ In `index.html`:
 
 | Parameter | Default | Effect |
 |-----------|---------|--------|
-| `IMAGE_URL` | Gabibbo image | Source image to convert |
-| `ASCII_SERVICE` | localhost:3002 | ASCII service endpoint |
-| `COLUMNS` | 60 | ASCII art width in characters |
-| `minOpacity` | 0.15 | Opacity during silence |
-| `maxOpacity` | 1.0 | Opacity at peak volume |
+| `DEFAULT_FONT_SIZE` | 10 | Maximum font size in pixels |
+| `MIN_FONT_SIZE` | 4 | Minimum font size |
+| `CHAR_WIDTH_RATIO` | 0.6 | Monospace character width ratio for canvas |
+| `MIN_OPACITY` | 0.15 | Opacity during silence |
+| `OPACITY_RANGE` | 0.85 | Range from min to max (1.0 - 0.15) |
 
-## Dependencies
+## Gallery Format
 
-Requires the `ascii-service` to be running:
+`gallery.json` contains pre-generated ASCII art:
 
-```bash
-make ascii  # or make start
+```json
+{
+  "images": [
+    {
+      "id": "image-name",
+      "columns": 160,
+      "lines": ["line1", "line2", ...],
+      "frames": [["frame1-line1", ...], ...]  // For animated GIFs
+    }
+  ]
+}
 ```
+
+- `lines`: Static images
+- `frames`: Animated GIFs (advances on beat detection)
 
 ## Styling
 
-- Monospace font, 8px size
+- Monospace font, dynamically sized to fit constraints
 - White text on black background
-- CSS transition (0.1s) for smooth opacity changes
-- No letter-spacing, line-height: 1 for compact display
+- Canvas-based rendering (no CSS transitions needed)
 
 ## Running Standalone
 
 ```bash
-# Start ASCII service first
-make ascii
-
-# Serve the project
 cd draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz
 python3 -m http.server 8000
 # Open http://localhost:8000

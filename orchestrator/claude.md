@@ -132,7 +132,16 @@ orchestrator/
 │   ├── index.html    # Control panel + window container
 │   ├── styles.css    # Windows 98 style chrome
 │   ├── assets/       # SVG icons (close.svg, maximize.svg)
-│   └── modules/      # JS modules (main, windows, drag, audio, etc.)
+│   └── modules/
+│       ├── main.js       # Entry point, init, main loop
+│       ├── windows.js    # Window creation, positioning, resize
+│       ├── gallery.js    # Pre-loads draw_me gallery for instant sizing
+│       ├── audio.js      # Audio capture and broadcast
+│       ├── drag.js       # Window dragging
+│       ├── modal.js      # Project selection modal
+│       ├── config.js     # Configuration constants
+│       ├── state.js      # Shared state
+│       └── ui.js         # UI updates
 ├── package.json
 └── CLAUDE.md         # This file
 ```
@@ -164,6 +173,7 @@ Some projects support selecting specific assets instead of random selection:
 - Displays ASCII art versions of images (static or animated GIFs)
 - Assets: cell-tower variants, dancing-miku, earth (animated), etc.
 - URL parameter: `?image=<id>` (e.g., `?image=earth`)
+- **Instant sizing**: Gallery is pre-loaded at startup; windows open with correct size immediately (no resize flash)
 
 **circling_cycle** (`shapes.json`):
 - Text flowing along geometric SVG paths
@@ -181,6 +191,16 @@ Press `Cmd+O` (macOS) or `Ctrl+O` (Windows/Linux) to open the project selection 
 3. Click "open" to create the window
 
 Auto-opened windows (triggered by audio) always use random asset selection.
+
+### Instant Window Sizing (draw_me)
+
+The orchestrator pre-loads the draw_me `gallery.json` at startup. When opening a draw_me window:
+
+1. **Pre-calculate dimensions**: Uses the same formula as draw_me to calculate exact window size
+2. **Create window with correct size**: No intermediate "loading" state or resize flash
+3. **Pass image data via postMessage**: The `init` message includes full ASCII data, so draw_me renders instantly without fetching `gallery.json` again
+
+This eliminates the delay where windows would appear as a square then resize.
 
 ## Controls
 

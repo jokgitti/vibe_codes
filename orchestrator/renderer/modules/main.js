@@ -12,6 +12,7 @@ import { initWindowContainer, recalculateGrid, createVirtualWindow, closeOldestW
 import { initModal } from './modal.js';
 import { initKeyboard, hideControlPanel } from './keyboard.js';
 import { initDrag, makeDraggable } from './drag.js';
+import { loadDrawMeGallery } from './gallery.js';
 
 // =============================================================================
 // DOM ELEMENTS (for event handlers)
@@ -486,6 +487,9 @@ async function init() {
 
   // Calculate initial grid
   recalculateGrid();
+
+  // Pre-load draw_me gallery for instant window sizing
+  await loadDrawMeGallery();
 
   // Start audio
   await initAudio();

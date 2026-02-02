@@ -20,52 +20,36 @@
       overflow: hidden;
     }
 
-    .ascii-container {
-      display: flex;
-      flex-direction: column;
-      font-family: monospace;
-      font-size: 8px; /* Initial size, will be overridden by JS */
-      line-height: 1;
-      letter-spacing: 0px;
-      white-space: pre;
-      contain: layout style paint;
-    }
-
-    .ascii-line {
-      color: white;
-      opacity: 0.15;
-      /* Removed transition for performance - updates are fast enough */
-      will-change: opacity;
-      contain: layout style;
-    }
-
-    .loading {
-      color: white;
-      font-family: monospace;
-      opacity: 0.5;
+    #canvas {
+      /* Canvas is sized dynamically by JS */
     }
 
     .error {
       color: red;
       font-family: monospace;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
     }
   </style>
 </head>
 <body>
-  <div class="ascii-container" id="container">
-    <div class="loading">loading...</div>
-  </div>
+  <canvas id="canvas"></canvas>
+  <div class="error" id="error" style="display: none;"></div>
 
   <script>
     // Config
-    const DEFAULT_FONT_SIZE = 10; // Default font size in pixels
-    const MIN_FONT_SIZE = 4; // Minimum font size
-    const CHAR_WIDTH_RATIO = 0.455; // Matches ascii_magic's width_ratio of 2.2
+    const DEFAULT_FONT_SIZE = 10;
+    const MIN_FONT_SIZE = 4;
+    const CHAR_WIDTH_RATIO = 0.6; // Monospace character width ratio for canvas
 
-    const container = document.getElementById('container');
-    let lines = [];
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { alpha: false }); // Opaque for performance
+    const errorEl = document.getElementById('error');
+
     let currentImage = null;
-    let maxConstraints = null; // Will be set by orchestrator init message
+    let maxConstraints = null;
     let currentFontSize = DEFAULT_FONT_SIZE;
 
     // GIF animation state
@@ -73,7 +57,23 @@
     let frames = [];
     let currentFrameIndex = 0;
 
-    // Load gallery and store selected image (don't render yet)
+    // Current ASCII lines being displayed
+    let currentLines = [];
+    let numLines = 0;
+
+    // Opacity state - pre-allocated array
+    let opacities = [];
+
+    // Pre-calculated constants for opacity mapping
+    const MIN_OPACITY = 0.15;
+    const OPACITY_RANGE = 0.85; // 1.0 - 0.15
+    const INV_128 = 1 / 128;
+
+    // Rendering state
+    let needsRedraw = true;
+    let renderScheduled = false;
+
+    // Load gallery and store selected image
     async function loadGallery() {
       try {
         const response = await fetch('gallery.json');
@@ -84,63 +84,81 @@
           throw new Error('no images in gallery');
         }
 
-        // Check for URL parameter
         const urlParams = new URLSearchParams(window.location.search);
         const imageId = urlParams.get('image');
 
         if (imageId) {
-          // Find specific image by ID
           currentImage = gallery.images.find(img => img.id === imageId);
           if (!currentImage) {
             console.warn(`Image '${imageId}' not found, selecting random`);
             currentImage = gallery.images[Math.floor(Math.random() * gallery.images.length)];
           }
         } else {
-          // Pick a random image from the gallery
           currentImage = gallery.images[Math.floor(Math.random() * gallery.images.length)];
         }
 
         return currentImage;
       } catch (err) {
-        container.innerHTML = `<div class="error">failed to load: ${err.message}</div>`;
+        errorEl.textContent = `failed to load: ${err.message}`;
+        errorEl.style.display = 'block';
         console.error('Failed to load ASCII art:', err);
         return null;
       }
     }
 
     // Calculate optimal font size to fit within constraints
-    function calculateFontSize(columns, numLines, maxWidth, maxHeight) {
-      // Calculate max font size that fits width
+    function calculateFontSize(columns, lines, maxWidth, maxHeight) {
       const fontSizeByWidth = maxWidth / (columns * CHAR_WIDTH_RATIO);
-      // Calculate max font size that fits height
-      const fontSizeByHeight = maxHeight / numLines;
-      // Use the smaller of the two, clamped between min and default (never scale UP)
+      const fontSizeByHeight = maxHeight / lines;
       return Math.max(MIN_FONT_SIZE, Math.min(DEFAULT_FONT_SIZE, Math.floor(Math.min(fontSizeByWidth, fontSizeByHeight))));
     }
 
-    // Render with current image and constraints
+    // Setup canvas and render initial frame
     function renderWithConstraints() {
       if (!currentImage) return;
 
-      // Check if this is an animated GIF (has frames) or static image (has lines)
       isAnimated = Array.isArray(currentImage.frames) && currentImage.frames.length > 0;
       frames = isAnimated ? currentImage.frames : [currentImage.lines];
       currentFrameIndex = 0;
 
       const columns = currentImage.columns;
-      const numLines = frames[0].length;
+      numLines = frames[0].length;
 
       if (maxConstraints) {
-        // Calculate font size to fit within orchestrator constraints
         currentFontSize = calculateFontSize(columns, numLines, maxConstraints.maxWidth, maxConstraints.maxHeight);
       } else {
-        // Standalone mode: use window dimensions or default
         const maxWidth = window.innerWidth - 20;
         const maxHeight = window.innerHeight - 20;
         currentFontSize = calculateFontSize(columns, numLines, maxWidth, maxHeight);
       }
 
-      renderAscii(frames[0]);
+      // Initialize opacities array
+      opacities = new Array(numLines).fill(MIN_OPACITY);
+
+      // Setup canvas dimensions
+      const width = Math.ceil(columns * CHAR_WIDTH_RATIO * currentFontSize);
+      const height = numLines * currentFontSize;
+
+      // Set canvas size (accounting for device pixel ratio for sharpness)
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.scale(dpr, dpr);
+
+      // Configure text rendering
+      ctx.font = `${currentFontSize}px monospace`;
+      ctx.textBaseline = 'top';
+
+      // Store current lines
+      currentLines = frames[0];
+
+      // Initial render
+      needsRedraw = true;
+      scheduleRender();
+
+      // Request resize from orchestrator
       requestResize(columns, numLines);
     }
 
@@ -149,86 +167,78 @@
       if (!isAnimated || frames.length <= 1) return;
 
       currentFrameIndex = (currentFrameIndex + 1) % frames.length;
-      renderAscii(frames[currentFrameIndex]);
+      currentLines = frames[currentFrameIndex];
+      needsRedraw = true;
     }
 
-    // Request parent window to resize based on ASCII dimensions
-    function requestResize(columns, numLines) {
+    // Request parent window to resize
+    function requestResize(columns, lines) {
       const width = Math.ceil(columns * CHAR_WIDTH_RATIO * currentFontSize);
-      const height = numLines * currentFontSize;
+      const height = lines * currentFontSize;
 
-      // Send resize request to parent (orchestrator)
       if (window.parent !== window) {
         window.parent.postMessage({ type: 'resize', width, height }, '*');
       }
     }
 
-    // Cache for opacity values to avoid unnecessary style updates
-    let cachedOpacities = [];
-    const OPACITY_THRESHOLD = 0.02; // Only update if opacity changed by more than this
-
-    // Render ASCII art as individual lines (reuses existing elements when possible)
-    function renderAscii(asciiLines) {
-      const numLines = asciiLines.length;
-
-      // Reuse existing line elements if count matches
-      if (lines.length === numLines) {
-        for (let i = 0; i < numLines; i++) {
-          lines[i].textContent = asciiLines[i];
-        }
-      } else {
-        // Need to recreate - different line count
-        container.innerHTML = '';
-        lines = [];
-        cachedOpacities = [];
-
-        for (let i = 0; i < numLines; i++) {
-          const lineEl = document.createElement('div');
-          lineEl.className = 'ascii-line';
-          lineEl.textContent = asciiLines[i];
-          container.appendChild(lineEl);
-          lines.push(lineEl);
-          cachedOpacities.push(0.15);
-        }
-      }
-
-      container.style.fontSize = `${currentFontSize}px`;
+    // Schedule a render on next animation frame (debounced)
+    function scheduleRender() {
+      if (renderScheduled) return;
+      renderScheduled = true;
+      requestAnimationFrame(render);
     }
 
-    // Pre-calculated constants for opacity mapping
-    const MIN_OPACITY = 0.15;
-    const OPACITY_RANGE = 0.85; // 1.0 - 0.15
-    const INV_128 = 1 / 128;
+    // Render all lines to canvas in a single pass
+    function render() {
+      renderScheduled = false;
+      if (!needsRedraw || numLines === 0) return;
 
-    // Update line opacities based on time domain audio data
+      const width = canvas.width / (window.devicePixelRatio || 1);
+      const height = canvas.height / (window.devicePixelRatio || 1);
+
+      // Clear canvas with black background
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw each line with its opacity
+      for (let i = 0; i < numLines; i++) {
+        const opacity = opacities[i];
+        // Convert opacity to rgba for better performance than globalAlpha
+        const alpha = Math.round(opacity * 255);
+        ctx.fillStyle = `rgba(255,255,255,${opacity})`;
+        ctx.fillText(currentLines[i], 0, i * currentFontSize);
+      }
+
+      needsRedraw = false;
+    }
+
+    // Update opacities based on time domain audio data
     function updateOpacities(timeDomainData) {
-      const numLines = lines.length;
       if (numLines === 0) return;
 
-      // timeDomainData is already array-like, no need to create new Uint8Array
       const dataLen = timeDomainData.length;
-      const step = (dataLen / numLines) | 0; // Bitwise floor
+      const step = (dataLen / numLines) | 0;
+
+      let changed = false;
 
       for (let i = 0; i < numLines; i++) {
-        // Get sample value (0-255, center is 128)
         const sample = timeDomainData[i * step] || 128;
 
-        // Calculate deviation from center and map to opacity
-        // Optimized: combine operations, avoid abs() call
         let deviation = sample - 128;
         if (deviation < 0) deviation = -deviation;
 
-        // Map deviation to opacity (0.15 to 1.0)
-        const opacity = MIN_OPACITY + (deviation * INV_128 * OPACITY_RANGE);
+        const newOpacity = MIN_OPACITY + (deviation * INV_128 * OPACITY_RANGE);
 
-        // Only update DOM if opacity changed significantly
-        const cachedOpacity = cachedOpacities[i];
-        if (cachedOpacity === undefined ||
-            opacity - cachedOpacity > OPACITY_THRESHOLD ||
-            cachedOpacity - opacity > OPACITY_THRESHOLD) {
-          lines[i].style.opacity = opacity;
-          cachedOpacities[i] = opacity;
+        // Always update - canvas redraw is cheap
+        if (opacities[i] !== newOpacity) {
+          opacities[i] = newOpacity;
+          changed = true;
         }
+      }
+
+      if (changed) {
+        needsRedraw = true;
+        scheduleRender();
       }
     }
 
@@ -237,10 +247,15 @@
       if (!e.data) return;
 
       if (e.data.type === 'init') {
-        // Received constraints from orchestrator
         maxConstraints = { maxWidth: e.data.maxWidth, maxHeight: e.data.maxHeight };
         receivingOrchestratorAudio = true;
-        if (currentImage) {
+
+        // Use pre-loaded image data from orchestrator if provided (instant render)
+        if (e.data.imageData) {
+          currentImage = e.data.imageData;
+          renderWithConstraints();
+        } else if (currentImage) {
+          // Fallback: use locally loaded image
           renderWithConstraints();
         }
       } else if (e.data.type === 'audio') {
@@ -248,9 +263,9 @@
         if (e.data.timeDomainData) {
           updateOpacities(e.data.timeDomainData);
         }
-        // Advance frame on beat (for animated GIFs)
         if (e.data.beat && isAnimated) {
           nextFrame();
+          scheduleRender();
         }
       }
     });
@@ -273,10 +288,9 @@
 
         const dataArray = new Uint8Array(analyser.fftSize);
         let lastUpdateTime = 0;
-        const UPDATE_INTERVAL = 33; // ~30fps, match orchestrator
+        const UPDATE_INTERVAL = 33; // ~30fps
 
         function update(timestamp) {
-          // Throttle to 30fps to match orchestrator
           if (timestamp - lastUpdateTime >= UPDATE_INTERVAL) {
             analyser.getByteTimeDomainData(dataArray);
             updateOpacities(dataArray);
@@ -292,31 +306,24 @@
       }
     }
 
-    // Initialize: load gallery, then wait for orchestrator or render standalone
+    // Initialize
     async function init() {
-      await loadGallery();
+      const isStandalone = window.parent === window;
 
-      // If in orchestrator, wait for init message (handled by message listener)
-      // If standalone, render after a short delay
-      if (window.parent === window) {
-        // Standalone mode - render immediately
+      if (isStandalone) {
+        // Standalone mode: load gallery and render
+        await loadGallery();
         renderWithConstraints();
-      } else {
-        // In iframe - wait a bit for init message, fallback to standalone render
-        setTimeout(() => {
-          if (lines.length === 0 && currentImage) {
-            // No init received, render with defaults
-            renderWithConstraints();
-          }
-        }, 500);
       }
+      // In orchestrator mode (iframe): wait for init message with imageData
+      // The message handler will set currentImage and call renderWithConstraints
     }
 
     init();
 
-    // Only init local audio if not receiving external audio after a delay
+    // Init local audio after delay if not receiving orchestrator audio
     setTimeout(() => {
-      if (lines.length > 0) {
+      if (numLines > 0) {
         initLocalAudio();
       }
     }, 2000);
