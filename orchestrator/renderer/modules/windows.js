@@ -474,6 +474,7 @@ export function toggleMaximize(id) {
   if (!win) return;
 
   const windowEl = win.element;
+  const content = windowEl.querySelector('.win98-content');
 
   if (win.isMaximized) {
     // Restore to previous position and size
@@ -482,6 +483,15 @@ export function toggleMaximize(id) {
     windowEl.style.top = `${win.prevPosition.y}px`;
     windowEl.style.width = `${win.prevPosition.width}px`;
     windowEl.style.height = `${win.prevPosition.height}px`;
+
+    // Restore content size
+    if (content) {
+      const contentWidth = win.prevPosition.width - CONFIG.CHROME_PADDING;
+      const contentHeight = win.prevPosition.height - CONFIG.TITLEBAR_HEIGHT - CONFIG.CHROME_PADDING;
+      content.style.width = `${contentWidth}px`;
+      content.style.height = `${contentHeight}px`;
+    }
+
     win.isMaximized = false;
   } else {
     // Save current position and size
@@ -498,6 +508,15 @@ export function toggleMaximize(id) {
     windowEl.style.top = '0px';
     windowEl.style.width = `${windowContainer.clientWidth}px`;
     windowEl.style.height = `${windowContainer.clientHeight}px`;
+
+    // Resize content to fill maximized window
+    if (content) {
+      const contentWidth = windowContainer.clientWidth - CONFIG.CHROME_PADDING;
+      const contentHeight = windowContainer.clientHeight - CONFIG.TITLEBAR_HEIGHT - CONFIG.CHROME_PADDING;
+      content.style.width = `${contentWidth}px`;
+      content.style.height = `${contentHeight}px`;
+    }
+
     win.isMaximized = true;
 
     // Bring to front
