@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Audio-reactive window orchestrator for vibe_codes projects",
   "main": "main.js",
-  "type": "module",
   "scripts": {
     "start": "electron . --js-flags='--max-old-space-size=4096'",
     "lint": "eslint .",
