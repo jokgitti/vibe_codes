@@ -14,7 +14,7 @@ export const CONFIG = {
   MAX_WINDOWS: 35,
   MAX_PER_PROJECT: 7, // Default max per project
   PROJECT_LIMITS: {
-    'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz': 5 // Heavy to render
+    draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz: 5, // Heavy to render
   },
 
   // Audio
@@ -39,16 +39,17 @@ export const CONFIG = {
   BROADCAST_INTERVAL: 33,
 
   // BPM calculation
-  BPM_HISTORY_SIZE: 8,      // Number of beats to average
-  BPM_MAX_INTERVAL: 2000    // Ignore gaps > 2 seconds as "pauses"
+  BPM_HISTORY_SIZE: 8, // Number of beats to average
+  BPM_MAX_INTERVAL: 2000, // Ignore gaps > 2 seconds as "pauses"
 };
 
 // Available projects
 export const PROJECTS = [
-  'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz',
-  'circling_cycle',
-  'lucid_dream',
-  'pitchy_soundwave',
-  'rotating_gliph',
-  'tlkn_2_mslf'
+  "draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz",
+  "circling_cycle",
+  "lucid_dream",
+  "moody_parkour",
+  "pitchy_soundwave",
+  "rotating_gliph",
+  "tlkn_2_mslf",
 ];

@@ -2,47 +2,51 @@
 // VIRTUAL WINDOW MANAGEMENT & POSITIONING
 // =============================================================================
 
-import { CONFIG, PROJECTS } from './config.js';
-import { state } from './state.js';
-import { updateUI, setStatus } from './ui.js';
-import { makeDraggable, bringToFront } from './drag.js';
-import { calculateDrawMeDimensions } from './gallery.js';
+import { CONFIG, PROJECTS } from "./config.js";
+import { state } from "./state.js";
+import { updateUI, setStatus } from "./ui.js";
+import { makeDraggable, bringToFront } from "./drag.js";
+import { calculateDrawMeDimensions } from "./gallery.js";
+import { getMoodState } from "./mood.js";
 
 let windowContainer;
 
 export function initWindowContainer() {
-  windowContainer = document.getElementById('windowContainer');
+  windowContainer = document.getElementById("windowContainer");
 
   // Listen for resize requests from iframes
-  window.addEventListener('message', handleIframeMessage);
+  window.addEventListener("message", handleIframeMessage);
 }
 
 function handleIframeMessage(event) {
-  if (!event.data || event.data.type !== 'resize') return;
+  if (!event.data || event.data.type !== "resize") return;
 
   const { width, height } = event.data;
   if (!width || !height) return;
 
   // Find which window sent this message
-  const win = state.virtualWindows.find(w => w.iframe.contentWindow === event.source);
+  const win = state.virtualWindows.find(
+    (w) => w.iframe.contentWindow === event.source,
+  );
   if (!win) return;
 
   resizeWindow(win.id, width, height);
 }
 
 export function resizeWindow(id, contentWidth, contentHeight) {
-  const win = state.virtualWindows.find(w => w.id === id);
+  const win = state.virtualWindows.find((w) => w.id === id);
   if (!win) return;
 
   const windowEl = win.element;
   const totalWidth = contentWidth + CONFIG.CHROME_PADDING;
-  const totalHeight = contentHeight + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+  const totalHeight =
+    contentHeight + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
 
   windowEl.style.width = `${totalWidth}px`;
   windowEl.style.height = `${totalHeight}px`;
 
   // Update iframe size
-  const content = windowEl.querySelector('.win98-content');
+  const content = windowEl.querySelector(".win98-content");
   if (content) {
     content.style.width = `${contentWidth}px`;
     content.style.height = `${contentHeight}px`;
@@ -55,8 +59,14 @@ export function resizeWindow(id, contentWidth, contentHeight) {
   let y = parseInt(windowEl.style.top);
 
   // Clamp position to keep window in bounds
-  x = Math.max(CONFIG.WINDOW_GAP, Math.min(x, containerWidth - totalWidth - CONFIG.WINDOW_GAP));
-  y = Math.max(CONFIG.WINDOW_GAP, Math.min(y, containerHeight - totalHeight - CONFIG.WINDOW_GAP));
+  x = Math.max(
+    CONFIG.WINDOW_GAP,
+    Math.min(x, containerWidth - totalWidth - CONFIG.WINDOW_GAP),
+  );
+  y = Math.max(
+    CONFIG.WINDOW_GAP,
+    Math.min(y, containerHeight - totalHeight - CONFIG.WINDOW_GAP),
+  );
 
   windowEl.style.left = `${x}px`;
   windowEl.style.top = `${y}px`;
@@ -73,10 +83,17 @@ export function recalculateGrid() {
   const containerHeight = windowContainer.clientHeight;
 
   const totalWindowWidth = CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING;
-  const totalWindowHeight = CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+  const totalWindowHeight =
+    CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
 
-  state.gridCols = Math.floor((containerWidth - CONFIG.WINDOW_GAP) / (totalWindowWidth + CONFIG.WINDOW_GAP));
-  state.gridRows = Math.floor((containerHeight - CONFIG.WINDOW_GAP) / (totalWindowHeight + CONFIG.WINDOW_GAP));
+  state.gridCols = Math.floor(
+    (containerWidth - CONFIG.WINDOW_GAP) /
+      (totalWindowWidth + CONFIG.WINDOW_GAP),
+  );
+  state.gridRows = Math.floor(
+    (containerHeight - CONFIG.WINDOW_GAP) /
+      (totalWindowHeight + CONFIG.WINDOW_GAP),
+  );
 
   state.gridCols = Math.max(1, state.gridCols);
   state.gridRows = Math.max(1, state.gridRows);
@@ -94,14 +111,15 @@ export function recalculateGrid() {
 
 function getGridPosition(index) {
   const totalWindowWidth = CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING;
-  const totalWindowHeight = CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+  const totalWindowHeight =
+    CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
 
   const col = index % state.gridCols;
   const row = Math.floor(index / state.gridCols);
 
   return {
     x: CONFIG.WINDOW_GAP + col * (totalWindowWidth + CONFIG.WINDOW_GAP),
-    y: CONFIG.WINDOW_GAP + row * (totalWindowHeight + CONFIG.WINDOW_GAP)
+    y: CONFIG.WINDOW_GAP + row * (totalWindowHeight + CONFIG.WINDOW_GAP),
   };
 }
 
@@ -111,12 +129,18 @@ function getGridPosition(index) {
 
 export function getNextPosition() {
   switch (state.currentPattern) {
-    case 'grid': return getGridFillPosition();
-    case 'spiral': return getSpiralPosition();
-    case 'random': return getRandomPosition();
-    case 'cascade': return getCascadePosition();
-    case 'burst': return getCenterBurstPosition();
-    default: return getGridFillPosition();
+    case "grid":
+      return getGridFillPosition();
+    case "spiral":
+      return getSpiralPosition();
+    case "random":
+      return getRandomPosition();
+    case "cascade":
+      return getCascadePosition();
+    case "burst":
+      return getCenterBurstPosition();
+    default:
+      return getGridFillPosition();
   }
 }
 
@@ -135,7 +159,12 @@ function getSpiralPosition() {
   // Generate spiral order from center
   const centerCol = Math.floor(state.gridCols / 2);
   const centerRow = Math.floor(state.gridRows / 2);
-  const spiralOrder = generateSpiralOrder(centerCol, centerRow, state.gridCols, state.gridRows);
+  const spiralOrder = generateSpiralOrder(
+    centerCol,
+    centerRow,
+    state.gridCols,
+    state.gridRows,
+  );
 
   for (const idx of spiralOrder) {
     if (state.gridCells[idx] === null) {
@@ -148,8 +177,14 @@ function getSpiralPosition() {
 function generateSpiralOrder(cx, cy, cols, rows) {
   const order = [];
   const visited = new Set();
-  const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]]; // right, down, left, up
-  let x = cx, y = cy;
+  const dirs = [
+    [0, 1],
+    [1, 0],
+    [0, -1],
+    [-1, 0],
+  ]; // right, down, left, up
+  let x = cx,
+    y = cy;
   let dirIdx = 0;
   let steps = 1;
   let stepCount = 0;
@@ -186,12 +221,17 @@ function getRandomPosition() {
   const containerWidth = windowContainer.clientWidth;
   const containerHeight = windowContainer.clientHeight;
   const totalWidth = CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING;
-  const totalHeight = CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+  const totalHeight =
+    CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
 
   // Try to find non-overlapping position
   for (let attempt = 0; attempt < 50; attempt++) {
-    const x = Math.random() * (containerWidth - totalWidth - CONFIG.WINDOW_GAP) + CONFIG.WINDOW_GAP;
-    const y = Math.random() * (containerHeight - totalHeight - CONFIG.WINDOW_GAP) + CONFIG.WINDOW_GAP;
+    const x =
+      Math.random() * (containerWidth - totalWidth - CONFIG.WINDOW_GAP) +
+      CONFIG.WINDOW_GAP;
+    const y =
+      Math.random() * (containerHeight - totalHeight - CONFIG.WINDOW_GAP) +
+      CONFIG.WINDOW_GAP;
 
     let overlaps = false;
     for (const win of state.virtualWindows) {
@@ -212,15 +252,15 @@ function getRandomPosition() {
   return {
     x: Math.random() * (containerWidth - totalWidth),
     y: Math.random() * (containerHeight - totalHeight),
-    gridIndex: -1
+    gridIndex: -1,
   };
 }
 
 function getCascadePosition() {
   const offset = 30;
   const idx = state.virtualWindows.length;
-  const x = CONFIG.WINDOW_GAP + (idx * offset) % 300;
-  const y = CONFIG.WINDOW_GAP + (idx * offset) % 200;
+  const x = CONFIG.WINDOW_GAP + ((idx * offset) % 300);
+  const y = CONFIG.WINDOW_GAP + ((idx * offset) % 200);
   return { x, y, gridIndex: -1 };
 }
 
@@ -228,20 +268,31 @@ function getCenterBurstPosition() {
   const containerWidth = windowContainer.clientWidth;
   const containerHeight = windowContainer.clientHeight;
   const totalWidth = CONFIG.WINDOW_WIDTH + CONFIG.CHROME_PADDING;
-  const totalHeight = CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
+  const totalHeight =
+    CONFIG.WINDOW_HEIGHT + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING;
 
   // Start from center, spread out
   const centerX = (containerWidth - totalWidth) / 2;
   const centerY = (containerHeight - totalHeight) / 2;
 
   const idx = state.virtualWindows.length;
-  const angle = (idx * 137.5) * (Math.PI / 180); // Golden angle
+  const angle = idx * 137.5 * (Math.PI / 180); // Golden angle
   const radius = Math.sqrt(idx) * 80;
 
-  const x = Math.max(CONFIG.WINDOW_GAP, Math.min(containerWidth - totalWidth - CONFIG.WINDOW_GAP,
-    centerX + Math.cos(angle) * radius));
-  const y = Math.max(CONFIG.WINDOW_GAP, Math.min(containerHeight - totalHeight - CONFIG.WINDOW_GAP,
-    centerY + Math.sin(angle) * radius));
+  const x = Math.max(
+    CONFIG.WINDOW_GAP,
+    Math.min(
+      containerWidth - totalWidth - CONFIG.WINDOW_GAP,
+      centerX + Math.cos(angle) * radius,
+    ),
+  );
+  const y = Math.max(
+    CONFIG.WINDOW_GAP,
+    Math.min(
+      containerHeight - totalHeight - CONFIG.WINDOW_GAP,
+      centerY + Math.sin(angle) * radius,
+    ),
+  );
 
   return { x, y, gridIndex: -1 };
 }
@@ -258,16 +309,18 @@ function getProjectLimit(project) {
 export function getRandomProject() {
   // Filter by project filter setting
   let projectsToConsider = PROJECTS;
-  if (state.projectFilter !== 'all') {
+  if (state.projectFilter !== "all") {
     projectsToConsider = [state.projectFilter];
   }
 
   // When a single project is selected, skip per-project limits (only MAX_WINDOWS applies)
-  if (state.projectFilter !== 'all') {
+  if (state.projectFilter !== "all") {
     return projectsToConsider[0];
   }
 
-  const available = projectsToConsider.filter(p => state.projectCounts[p] < getProjectLimit(p));
+  const available = projectsToConsider.filter(
+    (p) => state.projectCounts[p] < getProjectLimit(p),
+  );
   if (available.length === 0) return null;
   return available[Math.floor(Math.random() * available.length)];
 }
@@ -281,13 +334,28 @@ export function createVirtualWindow() {
   if (!project) return null;
 
   // Skip per-project limit check when a single project filter is active
-  const skipProjectLimit = state.projectFilter !== 'all';
-  return createVirtualWindowWithProject(project, 'random', skipProjectLimit);
+  const skipProjectLimit = state.projectFilter !== "all";
+
+  // For moody_parkour, use detected emotion from music analysis
+  let asset = "random";
+  if (project === "moody_parkour") {
+    const mood = getMoodState();
+    asset = mood.emotion;
+    console.log(
+      `[moody_parkour] ${mood.emotion} (${mood.trend} ${mood.energyLevel})`,
+    );
+  }
+
+  return createVirtualWindowWithProject(project, asset, skipProjectLimit);
 }
 
-export function createVirtualWindowWithProject(project, asset = 'random', skipProjectLimit = false) {
+export function createVirtualWindowWithProject(
+  project,
+  asset = "random",
+  skipProjectLimit = false,
+) {
   if (state.virtualWindows.length >= CONFIG.MAX_WINDOWS) {
-    setStatus('max windows reached');
+    setStatus("max windows reached");
     return null;
   }
 
@@ -304,8 +372,13 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
   const id = state.windowIdCounter++;
 
   // Calculate max constraints for content
-  const maxWidth = windowContainer.clientWidth - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
-  const maxHeight = windowContainer.clientHeight - CONFIG.TITLEBAR_HEIGHT - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
+  const maxWidth =
+    windowContainer.clientWidth - CONFIG.CHROME_PADDING - CONFIG.WINDOW_GAP * 2;
+  const maxHeight =
+    windowContainer.clientHeight -
+    CONFIG.TITLEBAR_HEIGHT -
+    CONFIG.CHROME_PADDING -
+    CONFIG.WINDOW_GAP * 2;
 
   // Pre-calculate dimensions for draw_me project
   let contentWidth = CONFIG.WINDOW_WIDTH;
@@ -313,7 +386,7 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
   let resolvedAsset = asset;
   let drawMeImageData = null;
 
-  if (project === 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz') {
+  if (project === "draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz") {
     const dims = calculateDrawMeDimensions(asset, maxWidth, maxHeight);
     if (dims) {
       contentWidth = dims.width;
@@ -324,32 +397,32 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
   }
 
   // Create window element with correct size from the start
-  const windowEl = document.createElement('div');
-  windowEl.className = 'win98-window spawning';
+  const windowEl = document.createElement("div");
+  windowEl.className = "win98-window spawning";
   windowEl.style.left = `${x}px`;
   windowEl.style.top = `${y}px`;
   windowEl.style.width = `${contentWidth + CONFIG.CHROME_PADDING}px`;
   windowEl.style.height = `${contentHeight + CONFIG.TITLEBAR_HEIGHT + CONFIG.CHROME_PADDING}px`;
 
   // Title bar
-  const titleBar = document.createElement('div');
-  titleBar.className = 'win98-titlebar';
+  const titleBar = document.createElement("div");
+  titleBar.className = "win98-titlebar";
 
-  const title = document.createElement('span');
-  title.className = 'win98-title';
+  const title = document.createElement("span");
+  title.className = "win98-title";
   title.textContent = project;
 
-  const buttons = document.createElement('div');
-  buttons.className = 'win98-buttons';
+  const buttons = document.createElement("div");
+  buttons.className = "win98-buttons";
 
-  const closeButton = document.createElement('button');
-  closeButton.className = 'win98-btn win98-btn-close';
+  const closeButton = document.createElement("button");
+  closeButton.className = "win98-btn win98-btn-close";
   closeButton.onclick = () => closeVirtualWindow(id);
 
   // Add maximize button only for projects that support it
-  if (project !== 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz') {
-    const maximizeButton = document.createElement('button');
-    maximizeButton.className = 'win98-btn win98-btn-maximize';
+  if (project !== "draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz") {
+    const maximizeButton = document.createElement("button");
+    maximizeButton.className = "win98-btn win98-btn-maximize";
     maximizeButton.onclick = (e) => {
       e.stopPropagation();
       toggleMaximize(id);
@@ -361,25 +434,36 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
   titleBar.appendChild(buttons);
 
   // Content area with iframe - set size explicitly
-  const content = document.createElement('div');
-  content.className = 'win98-content';
+  const content = document.createElement("div");
+  content.className = "win98-content";
   content.style.width = `${contentWidth}px`;
   content.style.height = `${contentHeight}px`;
 
-  const iframe = document.createElement('iframe');
+  const iframe = document.createElement("iframe");
 
   // Build URL with asset parameter - always pass resolved asset for draw_me
   let url = `../../${project}/index.html`;
-  if (project === 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz' && resolvedAsset) {
+  if (
+    project === "draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz" &&
+    resolvedAsset
+  ) {
     // Always pass the image ID so draw_me loads the same image we calculated
     url += `?image=${encodeURIComponent(resolvedAsset)}`;
-  } else if (asset && asset !== 'random') {
-    const paramName = project === 'draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz' ? 'image' : 'shape';
+  } else if (asset && asset !== "random") {
+    // Map project to parameter name
+    let paramName;
+    if (project === "draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz") {
+      paramName = "image";
+    } else if (project === "moody_parkour") {
+      paramName = "emotion";
+    } else {
+      paramName = "shape";
+    }
     url += `?${paramName}=${encodeURIComponent(asset)}`;
   }
 
   iframe.src = url;
-  iframe.allow = 'microphone'; // Allow microphone for standalone mode
+  iframe.allow = "microphone"; // Allow microphone for standalone mode
 
   content.appendChild(iframe);
   windowEl.appendChild(titleBar);
@@ -390,7 +474,7 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
   makeDraggable(windowEl, titleBar);
 
   // Bring to front when clicking anywhere on window
-  windowEl.addEventListener('mousedown', () => bringToFront(windowEl));
+  windowEl.addEventListener("mousedown", () => bringToFront(windowEl));
 
   // Track window
   const win = { id, element: windowEl, iframe, project, gridIndex };
@@ -402,32 +486,32 @@ export function createVirtualWindowWithProject(project, asset = 'random', skipPr
   }
 
   // Send init message with max dimensions when iframe loads
-  iframe.addEventListener('load', () => {
+  iframe.addEventListener("load", () => {
     const initMessage = {
-      type: 'init',
+      type: "init",
       maxWidth,
-      maxHeight
+      maxHeight,
     };
     // Include pre-loaded image data for draw_me to avoid duplicate fetch
     if (drawMeImageData) {
       initMessage.imageData = drawMeImageData;
     }
-    iframe.contentWindow.postMessage(initMessage, '*');
+    iframe.contentWindow.postMessage(initMessage, "*");
   });
 
   // Remove spawning class after animation
-  setTimeout(() => windowEl.classList.remove('spawning'), 300);
+  setTimeout(() => windowEl.classList.remove("spawning"), 300);
 
   updateUI();
   return win;
 }
 
 export function closeVirtualWindow(id) {
-  const idx = state.virtualWindows.findIndex(w => w.id === id);
+  const idx = state.virtualWindows.findIndex((w) => w.id === id);
   if (idx === -1) return;
 
   const win = state.virtualWindows[idx];
-  win.element.classList.add('closing');
+  win.element.classList.add("closing");
 
   // Clear grid cell
   if (win.gridIndex >= 0 && win.gridIndex < state.gridCells.length) {
@@ -470,15 +554,15 @@ export function closeAllWindows() {
 // =============================================================================
 
 export function toggleMaximize(id) {
-  const win = state.virtualWindows.find(w => w.id === id);
+  const win = state.virtualWindows.find((w) => w.id === id);
   if (!win) return;
 
   const windowEl = win.element;
-  const content = windowEl.querySelector('.win98-content');
+  const content = windowEl.querySelector(".win98-content");
 
   if (win.isMaximized) {
     // Restore to previous position and size
-    windowEl.classList.remove('maximized');
+    windowEl.classList.remove("maximized");
     windowEl.style.left = `${win.prevPosition.x}px`;
     windowEl.style.top = `${win.prevPosition.y}px`;
     windowEl.style.width = `${win.prevPosition.width}px`;
@@ -487,7 +571,10 @@ export function toggleMaximize(id) {
     // Restore content size
     if (content) {
       const contentWidth = win.prevPosition.width - CONFIG.CHROME_PADDING;
-      const contentHeight = win.prevPosition.height - CONFIG.TITLEBAR_HEIGHT - CONFIG.CHROME_PADDING;
+      const contentHeight =
+        win.prevPosition.height -
+        CONFIG.TITLEBAR_HEIGHT -
+        CONFIG.CHROME_PADDING;
       content.style.width = `${contentWidth}px`;
       content.style.height = `${contentHeight}px`;
     }
@@ -499,20 +586,23 @@ export function toggleMaximize(id) {
       x: parseInt(windowEl.style.left),
       y: parseInt(windowEl.style.top),
       width: parseInt(windowEl.style.width),
-      height: parseInt(windowEl.style.height)
+      height: parseInt(windowEl.style.height),
     };
 
     // Maximize to fill window container
-    windowEl.classList.add('maximized');
-    windowEl.style.left = '0px';
-    windowEl.style.top = '0px';
+    windowEl.classList.add("maximized");
+    windowEl.style.left = "0px";
+    windowEl.style.top = "0px";
     windowEl.style.width = `${windowContainer.clientWidth}px`;
     windowEl.style.height = `${windowContainer.clientHeight}px`;
 
     // Resize content to fill maximized window
     if (content) {
       const contentWidth = windowContainer.clientWidth - CONFIG.CHROME_PADDING;
-      const contentHeight = windowContainer.clientHeight - CONFIG.TITLEBAR_HEIGHT - CONFIG.CHROME_PADDING;
+      const contentHeight =
+        windowContainer.clientHeight -
+        CONFIG.TITLEBAR_HEIGHT -
+        CONFIG.CHROME_PADDING;
       content.style.width = `${contentWidth}px`;
       content.style.height = `${contentHeight}px`;
     }

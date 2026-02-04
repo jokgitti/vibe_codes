@@ -7,7 +7,7 @@
 body {
   background-color: #008080; /* Windows 98 teal desktop */
   color: #000;
-  font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif;
+  font-family: "MS Sans Serif", "Segoe UI", Tahoma, sans-serif;
   min-height: 100vh;
   overflow: hidden;
 }
@@ -43,13 +43,45 @@ body {
   gap: 15px;
 }
 
-.bpm-label {
+.stats-footer {
   border-top: 1px solid #808080;
   padding-top: 8px;
-  font-size: 11px;
-  text-align: right;
-  color: #000;
+  display: flex;
+  justify-content: space-between;
+  white-space: nowrap;
 }
+
+.bpm-label {
+  font-size: 11px;
+  color: #000;
+  white-space: nowrap;
+}
+
+/* Mood emotion colors */
+.mood-happy {
+  color: #b8860b;
+} /* dark goldenrod */
+.mood-sad {
+  color: #4169e1;
+} /* royal blue */
+.mood-angry {
+  color: #dc143c;
+} /* crimson */
+.mood-love {
+  color: #db7093;
+} /* pale violet red */
+.mood-surprised {
+  color: #ff8c00;
+} /* dark orange */
+.mood-confused {
+  color: #8a2be2;
+} /* blue violet */
+.mood-sleepy {
+  color: #6a5acd;
+} /* slate blue */
+.mood-excited {
+  color: #228b22;
+} /* forest green */
 
 .stats {
   display: flex;
@@ -190,7 +222,7 @@ button:active {
 .title-letters {
   display: flex;
   justify-content: center;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 48px;
   font-weight: normal;
 }
@@ -207,7 +239,7 @@ button:active {
 }
 
 .subtitle {
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 14px;
   margin-top: 15px;
   color: rgba(255, 255, 255, 0);
@@ -223,7 +255,8 @@ button:active {
 }
 
 @keyframes subtitlePulse {
-  0%, 100% {
+  0%,
+  100% {
     color: rgba(255, 255, 255, 0.4);
   }
   50% {
@@ -273,7 +306,11 @@ button:active {
 
 .win98-window.maximized {
   z-index: 999999;
-  transition: left 0.15s ease-out, top 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out;
+  transition:
+    left 0.15s ease-out,
+    top 0.15s ease-out,
+    width 0.15s ease-out,
+    height 0.15s ease-out;
 }
 
 /* Title Bar */
@@ -324,7 +361,7 @@ button:active {
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  font-family: 'MS Sans Serif', sans-serif;
+  font-family: "MS Sans Serif", sans-serif;
 }
 
 .win98-btn:hover {
@@ -336,22 +373,22 @@ button:active {
 }
 
 .win98-btn-close {
-  background: #c0c0c0 url('assets/close.svg') no-repeat center;
+  background: #c0c0c0 url("assets/close.svg") no-repeat center;
   background-size: 8px 7px;
 }
 
 .win98-btn-close:hover {
-  background: #c0c0c0 url('assets/close.svg') no-repeat center;
+  background: #c0c0c0 url("assets/close.svg") no-repeat center;
   background-size: 8px 7px;
 }
 
 .win98-btn-maximize {
-  background: #c0c0c0 url('assets/maximize.svg') no-repeat center;
+  background: #c0c0c0 url("assets/maximize.svg") no-repeat center;
   background-size: 9px 9px;
 }
 
 .win98-btn-maximize:hover {
-  background: #c0c0c0 url('assets/maximize.svg') no-repeat center;
+  background: #c0c0c0 url("assets/maximize.svg") no-repeat center;
   background-size: 9px 9px;
 }
 
@@ -502,7 +539,7 @@ button:active {
 .audio-time {
   font-size: 11px;
   text-align: center;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
 }
 
 .audio-controls {
@@ -516,7 +553,7 @@ button:active {
   height: 24px;
   font-size: 11px;
   font-weight: bold;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   display: flex;
   align-items: center;
   justify-content: center;

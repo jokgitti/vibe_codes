@@ -1,158 +1,197 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orchestrator v2</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div class="app">
-    <!-- Control Panel Window (hidden by default, Cmd+I to toggle) -->
-    <div class="win98-window control-panel-window hidden" id="controlPanelWindow">
-      <div class="win98-titlebar" id="controlPanelTitlebar">
-        <span class="win98-title">control_panel</span>
-        <div class="win98-buttons">
-          <button class="win98-btn win98-btn-close" id="controlPanelClose"></button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orchestrator v2</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- Control Panel Window (hidden by default, Cmd+I to toggle) -->
+      <div
+        class="win98-window control-panel-window hidden"
+        id="controlPanelWindow"
+      >
+        <div class="win98-titlebar" id="controlPanelTitlebar">
+          <span class="win98-title">control_panel</span>
+          <div class="win98-buttons">
+            <button
+              class="win98-btn win98-btn-close"
+              id="controlPanelClose"
+            ></button>
+          </div>
         </div>
-      </div>
-      <div class="win98-content win98-panel-content control-panel-content">
-        <div class="stats">
-          <div class="stat-row">
-            <span class="label">audio</span>
-            <div class="bar-container win98-inset">
-              <div class="bar audio-bar" id="audioBar"></div>
-              <div class="threshold-line" id="thresholdLine"></div>
+        <div class="win98-content win98-panel-content control-panel-content">
+          <div class="stats">
+            <div class="stat-row">
+              <span class="label">audio</span>
+              <div class="bar-container win98-inset">
+                <div class="bar audio-bar" id="audioBar"></div>
+                <div class="threshold-line" id="thresholdLine"></div>
+              </div>
+            </div>
+
+            <div class="stat-row slider-row">
+              <span class="label">sensitivity</span>
+              <input
+                type="range"
+                id="sensitivitySlider"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value="1"
+              />
+              <span class="count" id="sensitivityValue">1.0x</span>
+            </div>
+
+            <div class="stat-row">
+              <span class="label">windows</span>
+              <div class="bar-container win98-inset">
+                <div class="bar" id="windowBar"></div>
+              </div>
+              <span class="count" id="windowCount">0/50</span>
+            </div>
+
+            <div class="stat-row">
+              <span class="label">pattern</span>
+              <select id="patternSelect">
+                <option value="random">random</option>
+                <option value="grid">grid fill</option>
+                <option value="spiral">spiral</option>
+                <option value="cascade">cascade</option>
+                <option value="burst">center burst</option>
+              </select>
+            </div>
+
+            <div class="stat-row">
+              <span class="label">auto-open project</span>
+              <select id="projectFilterSelect">
+                <option value="all">all</option>
+              </select>
             </div>
           </div>
 
-          <div class="stat-row slider-row">
-            <span class="label">sensitivity</span>
-            <input type="range" id="sensitivitySlider" min="0.5" max="2" step="0.1" value="1">
-            <span class="count" id="sensitivityValue">1.0x</span>
+          <div class="status" id="status">initializing...</div>
+          <div class="stats-footer">
+            <span class="bpm-label"><span id="moodValue">--</span></span>
+            <span class="bpm-label"><span id="bpmValue">--</span> bpm</span>
           </div>
+        </div>
+      </div>
 
-          <div class="stat-row">
-            <span class="label">windows</span>
-            <div class="bar-container win98-inset">
-              <div class="bar" id="windowBar"></div>
+      <!-- Virtual Window Container -->
+      <main class="window-container" id="windowContainer">
+        <!-- Virtual windows (iframes with Win98 chrome) will be added here -->
+
+        <!-- Title overlay (shown when auto-open is off) -->
+        <div class="title-overlay" id="titleOverlay">
+          <div class="title-letters" id="titleLetters"></div>
+          <p class="subtitle" id="subtitle">press cmd + s to vibe</p>
+        </div>
+      </main>
+
+      <!-- Project Selection Modal -->
+      <div class="modal-overlay" id="modalOverlay">
+        <div class="modal win98-window">
+          <div class="win98-titlebar" id="modalTitlebar">
+            <span class="win98-title">open_project</span>
+            <div class="win98-buttons">
+              <button
+                class="win98-btn win98-btn-close"
+                id="modalClose"
+              ></button>
             </div>
-            <span class="count" id="windowCount">0/50</span>
           </div>
-
-          <div class="stat-row">
-            <span class="label">pattern</span>
-            <select id="patternSelect">
-              <option value="random">random</option>
-              <option value="grid">grid fill</option>
-              <option value="spiral">spiral</option>
-              <option value="cascade">cascade</option>
-              <option value="burst">center burst</option>
-            </select>
+          <div class="modal-content">
+            <div class="project-select-container">
+              <label class="label" for="projectSelect">project:</label>
+              <select id="projectSelect"></select>
+            </div>
+            <div
+              id="assetSelectContainer"
+              class="asset-select-container hidden"
+            >
+              <label class="label" for="assetSelect">asset:</label>
+              <select id="assetSelect">
+                <option value="random">random</option>
+              </select>
+            </div>
           </div>
-
-          <div class="stat-row">
-            <span class="label">auto-open project</span>
-            <select id="projectFilterSelect">
-              <option value="all">all</option>
-            </select>
+          <div class="modal-buttons">
+            <button id="modalOpenBtn">open</button>
+            <button id="modalCancelBtn">cancel</button>
           </div>
         </div>
-
-        <div class="status" id="status">initializing...</div>
-        <div class="bpm-label"><span id="bpmValue">--</span> bpm</div>
       </div>
-    </div>
 
-    <!-- Virtual Window Container -->
-    <main class="window-container" id="windowContainer">
-      <!-- Virtual windows (iframes with Win98 chrome) will be added here -->
-
-      <!-- Title overlay (shown when auto-open is off) -->
-      <div class="title-overlay" id="titleOverlay">
-        <div class="title-letters" id="titleLetters"></div>
-        <p class="subtitle" id="subtitle">press cmd + s to vibe</p>
+      <!-- File Picker Modal -->
+      <div class="modal-overlay" id="filePickerOverlay">
+        <div class="modal win98-window" id="filePickerModal">
+          <div class="win98-titlebar" id="filePickerTitlebar">
+            <span class="win98-title">open audio file</span>
+            <div class="win98-buttons">
+              <button
+                class="win98-btn win98-btn-close"
+                id="filePickerClose"
+              ></button>
+            </div>
+          </div>
+          <div class="modal-content">
+            <div class="drop-zone" id="dropZone">
+              <p>drag & drop audio file here</p>
+              <p class="drop-zone-hint">or click to browse</p>
+            </div>
+            <input
+              type="file"
+              id="fileInput"
+              accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
+              hidden
+            />
+          </div>
+          <div class="modal-buttons">
+            <button id="filePickerCancelBtn">cancel</button>
+          </div>
+        </div>
       </div>
-    </main>
 
-    <!-- Project Selection Modal -->
-    <div class="modal-overlay" id="modalOverlay">
-      <div class="modal win98-window">
-        <div class="win98-titlebar" id="modalTitlebar">
-          <span class="win98-title">open_project</span>
+      <!-- Audio Controller Window -->
+      <div
+        class="win98-window audio-controller-window hidden"
+        id="audioControllerWindow"
+      >
+        <div class="win98-titlebar" id="audioControllerTitlebar">
+          <span class="win98-title">music_player</span>
           <div class="win98-buttons">
-            <button class="win98-btn win98-btn-close" id="modalClose"></button>
+            <button
+              class="win98-btn win98-btn-close"
+              id="audioControllerClose"
+            ></button>
           </div>
         </div>
-        <div class="modal-content">
-          <div class="project-select-container">
-            <label class="label" for="projectSelect">project:</label>
-            <select id="projectSelect"></select>
+        <div class="win98-content win98-panel-content audio-controller-content">
+          <div class="audio-info win98-inset" id="audioInfo">
+            <div class="audio-track" id="audioTrackName">no file loaded</div>
+            <div class="audio-artist" id="audioArtistAlbum"></div>
           </div>
-          <div id="assetSelectContainer" class="asset-select-container hidden">
-            <label class="label" for="assetSelect">asset:</label>
-            <select id="assetSelect">
-              <option value="random">random</option>
-            </select>
+          <div
+            class="bar-container win98-inset audio-progress-container"
+            id="audioProgressContainer"
+          >
+            <div class="bar" id="audioProgress"></div>
           </div>
-        </div>
-        <div class="modal-buttons">
-          <button id="modalOpenBtn">open</button>
-          <button id="modalCancelBtn">cancel</button>
+          <div class="audio-time" id="audioTimeDisplay">0:00 / 0:00</div>
+          <div class="audio-controls">
+            <button class="audio-btn" id="audioBackBtn">|&lt;</button>
+            <button class="audio-btn" id="audioPlayPauseBtn">&gt;</button>
+            <button class="audio-btn" id="audioStopBtn">[ ]</button>
+            <button class="audio-btn" id="audioForwardBtn">&gt;|</button>
+            <button class="audio-btn" id="audioRepeatBtn">[R]</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- File Picker Modal -->
-    <div class="modal-overlay" id="filePickerOverlay">
-      <div class="modal win98-window" id="filePickerModal">
-        <div class="win98-titlebar" id="filePickerTitlebar">
-          <span class="win98-title">open audio file</span>
-          <div class="win98-buttons">
-            <button class="win98-btn win98-btn-close" id="filePickerClose"></button>
-          </div>
-        </div>
-        <div class="modal-content">
-          <div class="drop-zone" id="dropZone">
-            <p>drag & drop audio file here</p>
-            <p class="drop-zone-hint">or click to browse</p>
-          </div>
-          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac" hidden>
-        </div>
-        <div class="modal-buttons">
-          <button id="filePickerCancelBtn">cancel</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Audio Controller Window -->
-    <div class="win98-window audio-controller-window hidden" id="audioControllerWindow">
-      <div class="win98-titlebar" id="audioControllerTitlebar">
-        <span class="win98-title">music_player</span>
-        <div class="win98-buttons">
-          <button class="win98-btn win98-btn-close" id="audioControllerClose"></button>
-        </div>
-      </div>
-      <div class="win98-content win98-panel-content audio-controller-content">
-        <div class="audio-info win98-inset" id="audioInfo">
-          <div class="audio-track" id="audioTrackName">no file loaded</div>
-          <div class="audio-artist" id="audioArtistAlbum"></div>
-        </div>
-        <div class="bar-container win98-inset audio-progress-container" id="audioProgressContainer">
-          <div class="bar" id="audioProgress"></div>
-        </div>
-        <div class="audio-time" id="audioTimeDisplay">0:00 / 0:00</div>
-        <div class="audio-controls">
-          <button class="audio-btn" id="audioBackBtn">|&lt;</button>
-          <button class="audio-btn" id="audioPlayPauseBtn">&gt;</button>
-          <button class="audio-btn" id="audioStopBtn">[ ]</button>
-          <button class="audio-btn" id="audioForwardBtn">&gt;|</button>
-          <button class="audio-btn" id="audioRepeatBtn">[R]</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script type="module" src="modules/main.js"></script>
-</body>
+    <script type="module" src="modules/main.js"></script>
+  </body>
 </html>

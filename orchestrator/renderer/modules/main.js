@@ -2,17 +2,43 @@
 // ORCHESTRATOR v2 - MAIN ENTRY POINT
 // =============================================================================
 
-import { CONFIG, PROJECTS } from './config.js';
-import { state } from './state.js';
-import { initAudio, getVolume, getAverageVolume, getOnsetThreshold, getMinVolume, broadcastAudioData } from './audio.js';
-import { setPlaybackCallbacks, loadAudioFile, unloadAudioFile, playAudio, pauseAudio, stopAudio, seekRelative, setRepeat, isRepeatEnabled, isAudioPlaying, getAudioTime, getAudioDuration } from './playback.js';
-import { initUI, updateUI, setStatus } from './ui.js';
-import { initTitleElements, initTitleAnimation } from './title.js';
-import { initWindowContainer, recalculateGrid, createVirtualWindow, closeOldestWindow } from './windows.js';
-import { initModal } from './modal.js';
-import { initKeyboard, hideControlPanel } from './keyboard.js';
-import { initDrag, makeDraggable } from './drag.js';
-import { loadDrawMeGallery } from './gallery.js';
+import { CONFIG, PROJECTS } from "./config.js";
+import { state } from "./state.js";
+import {
+  initAudio,
+  getVolume,
+  getAverageVolume,
+  getOnsetThreshold,
+  getMinVolume,
+  broadcastAudioData,
+} from "./audio.js";
+import {
+  setPlaybackCallbacks,
+  loadAudioFile,
+  unloadAudioFile,
+  playAudio,
+  pauseAudio,
+  stopAudio,
+  seekRelative,
+  setRepeat,
+  isRepeatEnabled,
+  isAudioPlaying,
+  getAudioTime,
+  getAudioDuration,
+} from "./playback.js";
+import { initUI, updateUI, setStatus } from "./ui.js";
+import { initTitleElements, initTitleAnimation } from "./title.js";
+import {
+  initWindowContainer,
+  recalculateGrid,
+  createVirtualWindow,
+  closeOldestWindow,
+} from "./windows.js";
+import { initModal } from "./modal.js";
+import { initKeyboard, hideControlPanel } from "./keyboard.js";
+import { initDrag, makeDraggable } from "./drag.js";
+import { loadDrawMeGallery } from "./gallery.js";
+import { recordEnergySample } from "./mood.js";
 
 // =============================================================================
 // DOM ELEMENTS (for event handlers)
@@ -29,40 +55,44 @@ let fileInput, dropZone, filePickerCancelBtn;
 // Audio controller window
 let audioControllerWindow, audioControllerTitlebar, audioControllerClose;
 let audioTrackName, audioArtistAlbum, audioProgress, audioTimeDisplay;
-let audioPlayPauseBtn, audioStopBtn, audioBackBtn, audioForwardBtn, audioRepeatBtn;
+let audioPlayPauseBtn,
+  audioStopBtn,
+  audioBackBtn,
+  audioForwardBtn,
+  audioRepeatBtn;
 
 function initDOMElements() {
-  sensitivitySlider = document.getElementById('sensitivitySlider');
-  sensitivityValue = document.getElementById('sensitivityValue');
-  patternSelect = document.getElementById('patternSelect');
-  projectFilterSelect = document.getElementById('projectFilterSelect');
-  controlPanelWindow = document.getElementById('controlPanelWindow');
-  controlPanelTitlebar = document.getElementById('controlPanelTitlebar');
-  controlPanelClose = document.getElementById('controlPanelClose');
-  bpmValueEl = document.getElementById('bpmValue');
+  sensitivitySlider = document.getElementById("sensitivitySlider");
+  sensitivityValue = document.getElementById("sensitivityValue");
+  patternSelect = document.getElementById("patternSelect");
+  projectFilterSelect = document.getElementById("projectFilterSelect");
+  controlPanelWindow = document.getElementById("controlPanelWindow");
+  controlPanelTitlebar = document.getElementById("controlPanelTitlebar");
+  controlPanelClose = document.getElementById("controlPanelClose");
+  bpmValueEl = document.getElementById("bpmValue");
 
   // File picker modal
-  filePickerOverlay = document.getElementById('filePickerOverlay');
-  filePickerModal = document.getElementById('filePickerModal');
-  filePickerTitlebar = document.getElementById('filePickerTitlebar');
-  filePickerClose = document.getElementById('filePickerClose');
-  fileInput = document.getElementById('fileInput');
-  dropZone = document.getElementById('dropZone');
-  filePickerCancelBtn = document.getElementById('filePickerCancelBtn');
+  filePickerOverlay = document.getElementById("filePickerOverlay");
+  filePickerModal = document.getElementById("filePickerModal");
+  filePickerTitlebar = document.getElementById("filePickerTitlebar");
+  filePickerClose = document.getElementById("filePickerClose");
+  fileInput = document.getElementById("fileInput");
+  dropZone = document.getElementById("dropZone");
+  filePickerCancelBtn = document.getElementById("filePickerCancelBtn");
 
   // Audio controller window
-  audioControllerWindow = document.getElementById('audioControllerWindow');
-  audioControllerTitlebar = document.getElementById('audioControllerTitlebar');
-  audioControllerClose = document.getElementById('audioControllerClose');
-  audioTrackName = document.getElementById('audioTrackName');
-  audioArtistAlbum = document.getElementById('audioArtistAlbum');
-  audioProgress = document.getElementById('audioProgress');
-  audioTimeDisplay = document.getElementById('audioTimeDisplay');
-  audioPlayPauseBtn = document.getElementById('audioPlayPauseBtn');
-  audioStopBtn = document.getElementById('audioStopBtn');
-  audioBackBtn = document.getElementById('audioBackBtn');
-  audioForwardBtn = document.getElementById('audioForwardBtn');
-  audioRepeatBtn = document.getElementById('audioRepeatBtn');
+  audioControllerWindow = document.getElementById("audioControllerWindow");
+  audioControllerTitlebar = document.getElementById("audioControllerTitlebar");
+  audioControllerClose = document.getElementById("audioControllerClose");
+  audioTrackName = document.getElementById("audioTrackName");
+  audioArtistAlbum = document.getElementById("audioArtistAlbum");
+  audioProgress = document.getElementById("audioProgress");
+  audioTimeDisplay = document.getElementById("audioTimeDisplay");
+  audioPlayPauseBtn = document.getElementById("audioPlayPauseBtn");
+  audioStopBtn = document.getElementById("audioStopBtn");
+  audioBackBtn = document.getElementById("audioBackBtn");
+  audioForwardBtn = document.getElementById("audioForwardBtn");
+  audioRepeatBtn = document.getElementById("audioRepeatBtn");
 }
 
 function initControlPanel() {
@@ -70,13 +100,13 @@ function initControlPanel() {
   makeDraggable(controlPanelWindow, controlPanelTitlebar);
 
   // Close button hides the panel
-  controlPanelClose.addEventListener('click', () => {
+  controlPanelClose.addEventListener("click", () => {
     hideControlPanel();
   });
 
   // Populate project filter select
-  PROJECTS.forEach(project => {
-    const option = document.createElement('option');
+  PROJECTS.forEach((project) => {
+    const option = document.createElement("option");
     option.value = project;
     option.textContent = project;
     projectFilterSelect.appendChild(option);
@@ -88,12 +118,12 @@ function initControlPanel() {
 // =============================================================================
 
 export function showFilePicker() {
-  filePickerOverlay.classList.add('visible');
+  filePickerOverlay.classList.add("visible");
 }
 
 export function hideFilePicker() {
-  filePickerOverlay.classList.remove('visible');
-  fileInput.value = '';
+  filePickerOverlay.classList.remove("visible");
+  fileInput.value = "";
 }
 
 function initFilePicker() {
@@ -101,11 +131,11 @@ function initFilePicker() {
   makeDraggable(filePickerModal, filePickerTitlebar);
 
   // Close button
-  filePickerClose.addEventListener('click', hideFilePicker);
-  filePickerCancelBtn.addEventListener('click', hideFilePicker);
+  filePickerClose.addEventListener("click", hideFilePicker);
+  filePickerCancelBtn.addEventListener("click", hideFilePicker);
 
   // File input change
-  fileInput.addEventListener('change', async (e) => {
+  fileInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (file) {
       await handleFileSelection(file);
@@ -113,28 +143,28 @@ function initFilePicker() {
   });
 
   // Drag and drop
-  dropZone.addEventListener('dragover', (e) => {
+  dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
-    dropZone.classList.add('dragover');
+    dropZone.classList.add("dragover");
   });
 
-  dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragover');
+  dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("dragover");
   });
 
-  dropZone.addEventListener('drop', async (e) => {
+  dropZone.addEventListener("drop", async (e) => {
     e.preventDefault();
-    dropZone.classList.remove('dragover');
+    dropZone.classList.remove("dragover");
     const file = e.dataTransfer.files[0];
     if (file && file.name.match(/\.(mp3|wav|flac)$/i)) {
       await handleFileSelection(file);
     } else {
-      setStatus('please drop an mp3, wav, or flac file');
+      setStatus("please drop an mp3, wav, or flac file");
     }
   });
 
   // Click on drop zone triggers file input
-  dropZone.addEventListener('click', () => {
+  dropZone.addEventListener("click", () => {
     fileInput.click();
   });
 }
@@ -156,7 +186,7 @@ async function handleFileSelection(file) {
 let audioControllerPositioned = false;
 
 function showAudioController() {
-  audioControllerWindow.classList.remove('hidden');
+  audioControllerWindow.classList.remove("hidden");
 
   // Position at bottom center on first show
   if (!audioControllerPositioned) {
@@ -170,7 +200,7 @@ function showAudioController() {
 }
 
 function hideAudioController() {
-  audioControllerWindow.classList.add('hidden');
+  audioControllerWindow.classList.add("hidden");
 }
 
 function initAudioController() {
@@ -178,14 +208,14 @@ function initAudioController() {
   makeDraggable(audioControllerWindow, audioControllerTitlebar);
 
   // Close button - unloads audio and hides controller
-  audioControllerClose.addEventListener('click', () => {
+  audioControllerClose.addEventListener("click", () => {
     unloadAudioFile();
     hideAudioController();
-    setStatus('audio unloaded');
+    setStatus("audio unloaded");
   });
 
   // Play/Pause button
-  audioPlayPauseBtn.addEventListener('click', () => {
+  audioPlayPauseBtn.addEventListener("click", () => {
     if (isAudioPlaying()) {
       pauseAudio();
     } else {
@@ -195,30 +225,30 @@ function initAudioController() {
   });
 
   // Stop button
-  audioStopBtn.addEventListener('click', () => {
+  audioStopBtn.addEventListener("click", () => {
     stopAudio();
     updatePlayPauseButton();
     resetBPM();
   });
 
   // Back 10s button
-  audioBackBtn.addEventListener('click', () => {
+  audioBackBtn.addEventListener("click", () => {
     seekRelative(-10);
   });
 
   // Forward 10s button
-  audioForwardBtn.addEventListener('click', () => {
+  audioForwardBtn.addEventListener("click", () => {
     seekRelative(10);
   });
 
   // Repeat button
-  audioRepeatBtn.addEventListener('click', () => {
+  audioRepeatBtn.addEventListener("click", () => {
     setRepeat(!isRepeatEnabled());
     updateRepeatButton();
   });
 
   // Progress bar click to seek
-  audioProgress.parentElement.addEventListener('click', (e) => {
+  audioProgress.parentElement.addEventListener("click", (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
     const duration = getAudioDuration();
@@ -238,14 +268,14 @@ function initAudioController() {
       resetBPM();
 
       // Display track name (from metadata or filename)
-      const trackName = metadata?.title || name.replace(/\.[^/.]+$/, '');
+      const trackName = metadata?.title || name.replace(/\.[^/.]+$/, "");
       audioTrackName.textContent = trackName;
 
       // Display artist and album if available
       const parts = [];
       if (metadata?.artist) parts.push(metadata.artist);
       if (metadata?.album) parts.push(metadata.album);
-      audioArtistAlbum.textContent = parts.join(' - ');
+      audioArtistAlbum.textContent = parts.join(" - ");
 
       updateProgressDisplay(0, duration);
     },
@@ -254,19 +284,19 @@ function initAudioController() {
     },
     onAudioUnloaded: () => {
       resetBPM();
-      audioTrackName.textContent = 'no file loaded';
-      audioArtistAlbum.textContent = '';
+      audioTrackName.textContent = "no file loaded";
+      audioArtistAlbum.textContent = "";
       updateProgressDisplay(0, 0);
-    }
+    },
   });
 }
 
 function updatePlayPauseButton() {
-  audioPlayPauseBtn.textContent = isAudioPlaying() ? '||' : '>';
+  audioPlayPauseBtn.textContent = isAudioPlaying() ? "||" : ">";
 }
 
 function updateRepeatButton() {
-  audioRepeatBtn.classList.toggle('active', isRepeatEnabled());
+  audioRepeatBtn.classList.toggle("active", isRepeatEnabled());
 }
 
 function updateProgressDisplay(currentTime, duration) {
@@ -276,10 +306,10 @@ function updateProgressDisplay(currentTime, duration) {
 }
 
 function formatTime(seconds) {
-  if (!seconds || isNaN(seconds)) return '0:00';
+  if (!seconds || isNaN(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 // =============================================================================
@@ -287,21 +317,21 @@ function formatTime(seconds) {
 // =============================================================================
 
 function initEventHandlers() {
-  sensitivitySlider.addEventListener('input', (e) => {
+  sensitivitySlider.addEventListener("input", (e) => {
     state.sensitivity = parseFloat(e.target.value);
-    sensitivityValue.textContent = state.sensitivity.toFixed(1) + 'x';
+    sensitivityValue.textContent = state.sensitivity.toFixed(1) + "x";
   });
 
-  patternSelect.addEventListener('change', (e) => {
+  patternSelect.addEventListener("change", (e) => {
     state.currentPattern = e.target.value;
     recalculateGrid();
   });
 
-  projectFilterSelect.addEventListener('change', (e) => {
+  projectFilterSelect.addEventListener("change", (e) => {
     state.projectFilter = e.target.value;
   });
 
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     recalculateGrid();
   });
 }
@@ -352,13 +382,13 @@ function calculateBPM() {
 function updateBPMDisplay() {
   if (!bpmValueEl) return;
   const bpm = calculateBPM();
-  bpmValueEl.textContent = bpm !== null ? bpm : '--';
+  bpmValueEl.textContent = bpm !== null ? bpm : "--";
 }
 
 function resetBPM() {
   state.beatTimestamps = [];
   if (bpmValueEl) {
-    bpmValueEl.textContent = '--';
+    bpmValueEl.textContent = "--";
   }
 }
 
@@ -409,10 +439,11 @@ function analyzeLoop(currentTime) {
 
   const onset = volume - recentAvg;
 
-  if (onset > getOnsetThreshold() &&
-      timeSinceBeat > CONFIG.BEAT_COOLDOWN &&
-      volume > getMinVolume()) {
-
+  if (
+    onset > getOnsetThreshold() &&
+    timeSinceBeat > CONFIG.BEAT_COOLDOWN &&
+    volume > getMinVolume()
+  ) {
     state.lastBeatTime = currentTime;
     state.pendingBeat = true; // Will persist until broadcast
     recordBeat();
@@ -424,8 +455,12 @@ function analyzeLoop(currentTime) {
         closeOldestWindow();
       }
       createVirtualWindow();
-      setStatus('beat - opening window...');
-      setTimeout(() => setStatus(state.autoOpenEnabled ? 'auto-open on' : 'auto-open off'), 500);
+      setStatus("beat - opening window...");
+      setTimeout(
+        () =>
+          setStatus(state.autoOpenEnabled ? "auto-open on" : "auto-open off"),
+        500,
+      );
     }
   }
 
@@ -435,21 +470,29 @@ function analyzeLoop(currentTime) {
   const isRelativelyQuiet = volume < avgVolume * 0.4 && avgVolume > 0;
   const isAbsolutelyQuiet = volume < getMinVolume();
 
-  if (state.autoOpenEnabled &&
-      (isRelativelyQuiet || isAbsolutelyQuiet) &&
-      state.virtualWindows.length > 0) {
-
+  if (
+    state.autoOpenEnabled &&
+    (isRelativelyQuiet || isAbsolutelyQuiet) &&
+    state.virtualWindows.length > 0
+  ) {
     // Adaptive cooldown: quieter = faster closing
     // Scale cooldown from 800ms (moderate quiet) down to 100ms (total silence)
     const minVol = getMinVolume();
-    const quietness = Math.max(0, Math.min(1, 1 - (volume / Math.max(minVol, 1))));
+    const quietness = Math.max(
+      0,
+      Math.min(1, 1 - volume / Math.max(minVol, 1)),
+    );
     const adaptiveCooldown = CONFIG.CLOSE_COOLDOWN * (1 - quietness * 0.875); // 800ms -> 100ms
 
     if (timeSinceClose > adaptiveCooldown) {
       state.lastCloseTime = currentTime;
       closeOldestWindow();
-      setStatus('quiet - closing window...');
-      setTimeout(() => setStatus(state.autoOpenEnabled ? 'auto-open on' : 'auto-open off'), 500);
+      setStatus("quiet - closing window...");
+      setTimeout(
+        () =>
+          setStatus(state.autoOpenEnabled ? "auto-open on" : "auto-open off"),
+        500,
+      );
     }
   }
 
@@ -458,6 +501,9 @@ function analyzeLoop(currentTime) {
     state.lastBroadcastTime = currentTime;
     broadcastAudioData(volume, state.pendingBeat);
     state.pendingBeat = false; // Reset after broadcast
+
+    // Record energy sample for mood detection (moody_parkour)
+    recordEnergySample(volume);
 
     // Update UI at same rate as broadcast (30fps is plenty for UI)
     updateUI();
@@ -497,7 +543,7 @@ async function init() {
   initTitleAnimation();
 
   // Set initial status
-  setStatus('auto-open off (cmd+s to start)');
+  setStatus("auto-open off (cmd+s to start)");
 
   // Start main loop
   requestAnimationFrame(analyzeLoop);

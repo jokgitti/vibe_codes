@@ -48,6 +48,7 @@ An audio-reactive window orchestrator that displays browser windows (iframes) sh
 ### Audio Analysis
 
 Uses frequency-domain analysis (aligned with other projects):
+
 - Captures microphone via `getUserMedia`
 - Analyzes frequency data using `getByteFrequencyData()`
 - Kick frequencies (< 150Hz) boosted 2x for better bass response
@@ -73,18 +74,21 @@ Each project has been adapted to receive this external audio data when running i
 ### Window Open Logic
 
 Opens a new window when:
+
 - Current volume > average × threshold (adjusted by sensitivity slider)
 - Minimum volume threshold met (adjusted by sensitivity slider)
 - Cooldown of 300ms has passed since last open
 - Auto-open is enabled (Cmd+S)
 
 The **auto-open project filter** controls which projects can be opened automatically:
+
 - **all** (default): Randomly selects from all available projects, respecting per-project limits
 - **specific project**: Only opens the selected project type, ignoring per-project limits (only MAX_WINDOWS applies)
 
 ### Window Close Logic
 
 Closes oldest window when:
+
 - Volume drops to < 40% of average (relative quiet) OR volume below minimum threshold (absolute quiet)
 - Adaptive cooldown has passed (800ms at moderate quiet, down to 100ms at total silence)
 - At least one window is open
@@ -103,20 +107,21 @@ Closes oldest window when:
 
 Parameters in `renderer/renderer.js`:
 
-| Parameter | Default | Effect |
-|-----------|---------|--------|
-| `WINDOW_WIDTH` | 400 | Virtual window width |
-| `WINDOW_HEIGHT` | 400 | Virtual window height |
-| `MAX_WINDOWS` | 35 | Maximum virtual windows |
-| `MAX_PER_PROJECT` | 7 | Default max windows per project |
-| `ONSET_THRESHOLD_BASE` | 8 | Base onset detection threshold |
-| `BEAT_COOLDOWN` | 300ms | Time between window opens |
-| `MIN_VOLUME_BASE` | 2 | Base minimum volume to trigger |
-| `CLOSE_COOLDOWN` | 800ms | Base time between closes (adaptive based on quietness) |
+| Parameter              | Default | Effect                                                 |
+| ---------------------- | ------- | ------------------------------------------------------ |
+| `WINDOW_WIDTH`         | 400     | Virtual window width                                   |
+| `WINDOW_HEIGHT`        | 400     | Virtual window height                                  |
+| `MAX_WINDOWS`          | 35      | Maximum virtual windows                                |
+| `MAX_PER_PROJECT`      | 7       | Default max windows per project                        |
+| `ONSET_THRESHOLD_BASE` | 8       | Base onset detection threshold                         |
+| `BEAT_COOLDOWN`        | 300ms   | Time between window opens                              |
+| `MIN_VOLUME_BASE`      | 2       | Base minimum volume to trigger                         |
+| `CLOSE_COOLDOWN`       | 800ms   | Base time between closes (adaptive based on quietness) |
 
 ### Sensitivity Slider
 
 The UI has a sensitivity slider (0.5x to 2.0x) that adjusts:
+
 - Onset threshold: `ONSET_THRESHOLD_BASE / sensitivity`
 - Minimum volume: `MIN_VOLUME_BASE / sensitivity`
 
@@ -183,9 +188,11 @@ npm run format:check  # Check formatting without changing files
 ## Available Projects
 
 The orchestrator randomly selects from:
+
 - `draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz` - ASCII art display (audio-reactive line opacity)
 - `circling_cycle` - Text animation along SVG paths (audio-reactive highlight speed)
 - `lucid_dream` - Slot-machine style letter display (audio-reactive brightness)
+- `moody_parkour` - Pixel art kaomoji display (changes on beats, emotion-based)
 - `pitchy_soundwave` - Microphone waveform visualizer
 - `rotating_gliph` - Audio-reactive 3D dodecahedron
 - `rotating_wireframe` - 3D wireframe model renderer
@@ -196,15 +203,55 @@ The orchestrator randomly selects from:
 Some projects support selecting specific assets instead of random selection:
 
 **draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz** (`gallery.json`):
+
 - Displays ASCII art versions of images (static or animated GIFs)
 - Assets: cell-tower variants, dancing-miku, earth (animated), etc.
 - URL parameter: `?image=<id>` (e.g., `?image=earth`)
 - **Instant sizing**: Gallery is pre-loaded at startup; windows open with correct size immediately (no resize flash)
 
 **circling_cycle** (`shapes.json`):
+
 - Text flowing along geometric SVG paths
 - Assets: circle, s-shape, figure8, heart, star
 - URL parameter: `?shape=<id>` (e.g., `?shape=heart`)
+
+**moody_parkour** (hardcoded emotions):
+
+- Pixel art kaomoji display that changes on beats
+- Emotions: happy, sad, angry, love, surprised, confused, sleepy, excited
+- URL parameter: `?emotion=<id>` (e.g., `?emotion=happy`)
+- Auto-opened windows use **music-based emotion detection** (see below)
+
+### Music-Based Emotion Detection (moody_parkour)
+
+When moody_parkour windows are auto-opened (via beat detection), the orchestrator analyzes the music's energy trend to select an appropriate emotion:
+
+| Trend   | Energy   | Emotion   |
+| ------- | -------- | --------- |
+| Erratic | high     | angry     |
+| Erratic | med+     | confused  |
+| Erratic | med/low  | surprised |
+| Rising  | high     | excited   |
+| Rising  | med+/med | happy     |
+| Rising  | low      | love      |
+| Falling | high     | excited   |
+| Falling | med+     | happy     |
+| Falling | med      | sad       |
+| Falling | low      | sleepy    |
+| Stable  | high     | excited   |
+| Stable  | med+     | happy     |
+| Stable  | med      | love      |
+| Stable  | low      | sleepy    |
+
+Rare emotions (angry, confused, surprised) only trigger on truly erratic patterns.
+
+The system tracks:
+
+- **Short window** (~500ms): Current energy level
+- **Long window** (~3s): Baseline energy level
+- **Trend**: Percentage change from baseline (>15% = rising, <-15% = falling)
+- **Variance**: High variance (>100) = erratic
+- **Energy bands**: low (<4), medium (4-10), medium-high (10-16), high (>16)
 
 ### Manual Project Opening
 
@@ -243,6 +290,7 @@ This eliminates the delay where windows would appear as a square then resize.
 ## Windows 98 Style
 
 Virtual windows have Windows 98 style chrome:
+
 - Blue gradient title bar (#000080 to #1084d0)
 - 3D beveled borders (outset/inset)
 - Title bar buttons with SVG icons (maximize, close)

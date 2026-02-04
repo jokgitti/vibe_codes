@@ -2,24 +2,27 @@
 // UI UPDATES
 // =============================================================================
 
-import { CONFIG } from './config.js';
-import { state } from './state.js';
+import { CONFIG } from "./config.js";
+import { state } from "./state.js";
+import { getMoodState } from "./mood.js";
 
 // DOM Elements (cached on module load)
-let windowBar, windowCountEl, audioBar, statusEl, thresholdLine;
+let windowBar, windowCountEl, audioBar, statusEl, thresholdLine, moodValueEl;
 
 // Cache previous values to avoid unnecessary DOM updates
 let prevAudioWidth = -1;
 let prevThresholdLeft = -1;
 let prevWindowWidth = -1;
-let prevWindowCount = '';
+let prevWindowCount = "";
+let prevMoodText = "";
 
 export function initUI() {
-  windowBar = document.getElementById('windowBar');
-  windowCountEl = document.getElementById('windowCount');
-  audioBar = document.getElementById('audioBar');
-  statusEl = document.getElementById('status');
-  thresholdLine = document.getElementById('thresholdLine');
+  windowBar = document.getElementById("windowBar");
+  windowCountEl = document.getElementById("windowCount");
+  audioBar = document.getElementById("audioBar");
+  statusEl = document.getElementById("status");
+  thresholdLine = document.getElementById("thresholdLine");
+  moodValueEl = document.getElementById("moodValue");
 }
 
 export function updateUI() {
@@ -49,7 +52,9 @@ export function updateUI() {
     prevThresholdLeft = thresholdLeft;
   }
 
-  const windowPercent = Math.round((state.virtualWindows.length / CONFIG.MAX_WINDOWS) * 100);
+  const windowPercent = Math.round(
+    (state.virtualWindows.length / CONFIG.MAX_WINDOWS) * 100,
+  );
   if (windowPercent !== prevWindowWidth) {
     windowBar.style.width = `${windowPercent}%`;
     prevWindowWidth = windowPercent;
@@ -59,6 +64,34 @@ export function updateUI() {
   if (windowCount !== prevWindowCount) {
     windowCountEl.textContent = windowCount;
     prevWindowCount = windowCount;
+  }
+
+  // Update mood display
+  if (moodValueEl) {
+    const mood = getMoodState();
+    // Trend arrows
+    const trendArrow =
+      {
+        rising: "↑",
+        falling: "↓",
+        stable: "→",
+        erratic: "↔",
+      }[mood.trend] || "?";
+    // Shortened energy
+    const energyShort =
+      {
+        low: "lo",
+        medium: "med",
+        "medium-high": "med+",
+        high: "hi",
+      }[mood.energyLevel] || "?";
+    const moodText = `${trendArrow} ${mood.emotion} ${energyShort}`;
+    if (moodText !== prevMoodText) {
+      moodValueEl.textContent = moodText;
+      // Update color class
+      moodValueEl.className = `mood-${mood.emotion}`;
+      prevMoodText = moodText;
+    }
   }
 }
 

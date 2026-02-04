@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moody Parkour</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: black;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    #display {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="display"></canvas>
+
+  <script>
+    // ==========================================================================
+    // KAOMOJI BY EMOTION
+    // ==========================================================================
+    const KAOMOJI = {
+      happy: [
+        '(^ω^)',
+        '(*^▽^*)',
+        '(´∀`)',
+        '＼(＾▽＾)／',
+        '(o^∀^o)',
+        'ヽ(・∀・)ﾉ',
+        '(≧◡≦)',
+        '(＾▽＾)',
+        '(*´∀`*)',
+        '(⌒▽⌒)',
+        '٩(◕‿◕｡)۶',
+        '(｡♥‿♥｡)',
+        '(◠‿◠)',
+        '(*≧ω≦)',
+        '(^_^)v'
+      ],
+      sad: [
+        '( ; ω ; )',
+        '(T_T)',
+        '(ಥ﹏ಥ)',
+        '(´；ω；`)',
+        '｡ﾟ(ﾟ´Д`ﾟ)ﾟ｡',
+        '(;_;)',
+        '(´;︵;`)',
+        '(｡•́︿•̀｡)',
+        '(ノ_<。)',
+        '(´°̥̥̥̥̥̥̥̥ω°̥̥̥̥̥̥̥̥`)',
+        '(っ˘̩╭╮˘̩)っ',
+        '｡:ﾟ(;´∩`;)ﾟ:｡',
+        '(´・ω・`)',
+        '(;´д`)',
+        '( ´_ゝ`)'
+      ],
+      angry: [
+        '(╯°□°)╯',
+        '(`Д´)',
+        '(>_<)',
+        '(｀ε´)',
+        '(ノಠ益ಠ)ノ',
+        '(╬ Ò﹏Ó)',
+        '(҂⌣̀_⌣́)',
+        '(ಠ_ಠ)',
+        '(¬_¬)',
+        '(눈_눈)',
+        '(｀皿´)',
+        '(#`Д´)',
+        '(╬▔皿▔)',
+        '凸(｀△´#)',
+        '(╬☉д⊙)'
+      ],
+      love: [
+        '(♡´▽`♡)',
+        '(´,,•ω•,,)♡',
+        '(◕‿◕)♡',
+        '♡(◡‿◡)',
+        '(´∀`)♡',
+        '(*♡∀♡)',
+        '(｡♥‿♥｡)',
+        '(◍•ᴗ•◍)❤',
+        '♡＾▽＾♡',
+        '(✿ ♥‿♥)',
+        '(´ω`♡)',
+        '(♥ω♥*)',
+        '(*´ω`♡',
+        '(♡ >ω< ♡)',
+        '(๑°o°๑)♡'
+      ],
+      surprised: [
+        '(゜o゜)',
+        'Σ(°△°|||)',
+        '(⊙_⊙)',
+        '(°ロ°)',
+        'Σ(ﾟДﾟ)',
+        '(゜ロ゜)',
+        '(○_○)',
+        'w(°o°)w',
+        '(๑°o°๑)',
+        '(°△°|||)',
+        'Σ(°△°|||)︴',
+        '(⊙.⊙)',
+        '(๑°⌓°๑)',
+        '(@_@)',
+        '(O.O)'
+      ],
+      confused: [
+        '(・・？)',
+        '(・_・ヾ',
+        '(？_？)',
+        '(｡ヘ°)',
+        '(・・;)',
+        '(?_?)',
+        '(◎_◎;)',
+        '(・∧‐)ゞ',
+        '＼(゜ロ＼)',
+        '(´･_･`)',
+        '(・・ )',
+        '(・ε・｀)',
+        '( ・◇・)?',
+        '(＠_＠;)',
+        '(⊙_⊙)?'
+      ],
+      sleepy: [
+        '(－ω－)',
+        '(´〜`)',
+        '(-.-)zzZ',
+        '(￣o￣) zzZ',
+        '(-_-) zzZ',
+        '(´-﹏-`;)',
+        '(。-ω-)zzz',
+        '(ᴗ˳ᴗ)',
+        '( ˘ᴗ˘ )',
+        '( ¯꒳​¯ )ᐝ',
+        '(-_-)゜zzz',
+        '(´ρ`)',
+        '(´～`)',
+        '( -_-)旦',
+        '｡ﾟ(ﾟ´ω`ﾟ)ﾟ｡'
+      ],
+      excited: [
+        '＼(◎o◎)／',
+        '(ノ°∀°)ノ',
+        'ヽ(>∀<☆)☆',
+        '(ﾉ´ヮ´)ﾉ*:･ﾟ✧',
+        '☆*:.｡.o(≧▽≦)o.｡.:*☆',
+        '(★^O^★)',
+        '(ノ^ヮ^)ノ*:・゚✧',
+        'ヾ(＾∇＾)',
+        '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧',
+        '٩(^ᴗ^)۶',
+        'ヽ(^o^)丿',
+        '(ﾉ≧∀≦)ﾉ',
+        '☆ミ(o*・ω・)ノ',
+        'ヾ(＠⌒ー⌒＠)ノ',
+        '(๑˃̵ᴗ˂̵)و'
+      ]
+    };
+
+    const EMOTIONS = Object.keys(KAOMOJI);
+
+    // Shuffle array in place (Fisher-Yates)
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // ==========================================================================
+    // CONFIGURATION
+    // ==========================================================================
+    const CONFIG = {
+      PIXEL_SIZE: 4,           // Size of each "pixel" in the display
+      FONT_SIZE: 16,           // Base font size for rendering kaomoji
+      PADDING: 20,             // Padding around the kaomoji
+      MIN_BEAT_INTERVAL: 200,  // Minimum ms between kaomoji changes
+      FFT_SIZE: 512,
+      BEAT_THRESHOLD: 1.3,     // Volume spike multiplier to detect beat
+      MIN_VOLUME: 3,           // Minimum volume to trigger beat
+      VOLUME_HISTORY_SIZE: 20  // Rolling window for average
+    };
+
+    // ==========================================================================
+    // STATE
+    // ==========================================================================
+    // Check URL parameter for emotion (from orchestrator modal)
+    function getInitialEmotion() {
+      const params = new URLSearchParams(window.location.search);
+      const emotionParam = params.get('emotion');
+      if (emotionParam && EMOTIONS.includes(emotionParam)) {
+        return emotionParam;
+      }
+      // Default: random emotion
+      return EMOTIONS[Math.floor(Math.random() * EMOTIONS.length)];
+    }
+
+    let currentEmotion = getInitialEmotion();
+    // Shuffle the kaomoji for this emotion so each window has different order
+    shuffleArray(KAOMOJI[currentEmotion]);
+    let currentKaomojiIndex = 0;
+    let lastBeatTime = 0;
+
+    // Audio state
+    let audioContext = null;
+    let analyser = null;
+    let volumeHistory = [];
+    let externalAudio = null;
+    let localUpdateInterval = null;
+    let mediaStream = null;
+
+    // Canvas
+    const canvas = document.getElementById('display');
+    const ctx = canvas.getContext('2d');
+
+    // ==========================================================================
+    // RENDERING
+    // ==========================================================================
+    function getCurrentKaomoji() {
+      return KAOMOJI[currentEmotion][currentKaomojiIndex];
+    }
+
+    function nextKaomoji() {
+      const list = KAOMOJI[currentEmotion];
+      currentKaomojiIndex = (currentKaomojiIndex + 1) % list.length;
+    }
+
+    function renderKaomoji() {
+      const kaomoji = getCurrentKaomoji();
+
+      // Measure text to size canvas
+      ctx.font = `${CONFIG.FONT_SIZE}px monospace`;
+      const metrics = ctx.measureText(kaomoji);
+      const textWidth = Math.ceil(metrics.width);
+      const textHeight = CONFIG.FONT_SIZE;
+
+      // Calculate canvas size (small for pixelation)
+      const renderWidth = textWidth + CONFIG.PADDING * 2;
+      const renderHeight = textHeight + CONFIG.PADDING * 2;
+
+      // Create offscreen canvas for high-res render
+      const offscreen = document.createElement('canvas');
+      offscreen.width = renderWidth;
+      offscreen.height = renderHeight;
+      const offCtx = offscreen.getContext('2d');
+
+      // Render text to offscreen canvas
+      offCtx.fillStyle = 'black';
+      offCtx.fillRect(0, 0, renderWidth, renderHeight);
+      offCtx.font = `${CONFIG.FONT_SIZE}px monospace`;
+      offCtx.fillStyle = 'white';
+      offCtx.textBaseline = 'middle';
+      offCtx.textAlign = 'center';
+      offCtx.fillText(kaomoji, renderWidth / 2, renderHeight / 2);
+
+      // Get pixel data
+      const imageData = offCtx.getImageData(0, 0, renderWidth, renderHeight);
+      const pixels = imageData.data;
+
+      // Calculate final canvas size (scaled up)
+      const finalWidth = renderWidth * CONFIG.PIXEL_SIZE;
+      const finalHeight = renderHeight * CONFIG.PIXEL_SIZE;
+
+      canvas.width = finalWidth;
+      canvas.height = finalHeight;
+
+      // Clear canvas
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, finalWidth, finalHeight);
+
+      // Draw pixelated version
+      ctx.fillStyle = 'white';
+      for (let y = 0; y < renderHeight; y++) {
+        for (let x = 0; x < renderWidth; x++) {
+          const i = (y * renderWidth + x) * 4;
+          // Check if pixel is "on" (any brightness)
+          const brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+          if (brightness > 30) {
+            ctx.fillRect(
+              x * CONFIG.PIXEL_SIZE,
+              y * CONFIG.PIXEL_SIZE,
+              CONFIG.PIXEL_SIZE - 1, // Gap between pixels for LED effect
+              CONFIG.PIXEL_SIZE - 1
+            );
+          }
+        }
+      }
+    }
+
+    // ==========================================================================
+    // AUDIO ANALYSIS
+    // ==========================================================================
+    function getVolume(timeDomainData) {
+      if (!timeDomainData || timeDomainData.length === 0) return 0;
+
+      // Time-domain analysis: average deviation from center (128)
+      let sum = 0;
+      for (let i = 0; i < timeDomainData.length; i++) {
+        sum += Math.abs(timeDomainData[i] - 128);
+      }
+      return sum / timeDomainData.length;
+    }
+
+    function getAverageVolume() {
+      if (volumeHistory.length === 0) return 0;
+      return volumeHistory.reduce((a, b) => a + b, 0) / volumeHistory.length;
+    }
+
+    function detectBeat(volume) {
+      const now = performance.now();
+
+      // Get average BEFORE adding current volume (important!)
+      const avgVolume = getAverageVolume();
+
+      // Update history after getting average
+      volumeHistory.push(volume);
+      if (volumeHistory.length > CONFIG.VOLUME_HISTORY_SIZE) {
+        volumeHistory.shift();
+      }
+
+      // Detect beat: volume spike above average, with cooldown
+      if (volume > avgVolume * CONFIG.BEAT_THRESHOLD &&
+          avgVolume > CONFIG.MIN_VOLUME &&
+          now - lastBeatTime > CONFIG.MIN_BEAT_INTERVAL) {
+        lastBeatTime = now;
+        return true;
+      }
+
+      return false;
+    }
+
+    function onBeat() {
+      nextKaomoji();
+      renderKaomoji();
+    }
+
+    // ==========================================================================
+    // EXTERNAL AUDIO (Orchestrator)
+    // ==========================================================================
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'audio') {
+        externalAudio = e.data;
+
+        // Stop local audio if running
+        if (localUpdateInterval) {
+          clearInterval(localUpdateInterval);
+          localUpdateInterval = null;
+        }
+
+        // Use orchestrator's beat detection directly
+        if (e.data.beat) {
+          onBeat();
+        }
+      }
+    });
+
+    // ==========================================================================
+    // LOCAL AUDIO INIT
+    // ==========================================================================
+    let timeDomainData = null;
+
+    async function initAudio() {
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        analyser = audioContext.createAnalyser();
+
+        analyser.fftSize = CONFIG.FFT_SIZE;
+        analyser.smoothingTimeConstant = 0.3;
+        source.connect(analyser);
+
+        timeDomainData = new Uint8Array(analyser.fftSize);
+
+        function update() {
+          if (!externalAudio) {
+            analyser.getByteTimeDomainData(timeDomainData);
+            const volume = getVolume(timeDomainData);
+            if (detectBeat(volume)) {
+              onBeat();
+            }
+          }
+        }
+
+        localUpdateInterval = setInterval(update, 33); // ~30fps
+      } catch (err) {
+        console.log('Microphone access denied - will use external audio if available');
+      }
+    }
+
+    // Clean up on close
+    window.addEventListener('beforeunload', () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+    });
+
+    // ==========================================================================
+    // INIT
+    // ==========================================================================
+    console.log(`Starting with emotion: ${currentEmotion}`);
+    renderKaomoji();
+    initAudio();
+  </script>
+</body>
+</html>
