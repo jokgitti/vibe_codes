@@ -55,6 +55,8 @@ body {
   font-size: 11px;
   color: #000;
   white-space: nowrap;
+  height: 14px;
+  line-height: 14px;
 }
 
 /* Mood emotion colors */

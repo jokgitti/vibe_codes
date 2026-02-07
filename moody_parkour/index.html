@@ -183,6 +183,14 @@
       return array;
     }
 
+    // Shuffle all kaomoji sets at startup so each window is out of sync
+    function shuffleAllKaomoji() {
+      for (const emotion of EMOTIONS) {
+        shuffleArray(KAOMOJI[emotion]);
+      }
+    }
+    shuffleAllKaomoji();
+
     // ==========================================================================
     // CONFIGURATION
     // ==========================================================================
@@ -212,9 +220,11 @@
     }
 
     let currentEmotion = getInitialEmotion();
-    // Shuffle the kaomoji for this emotion so each window has different order
-    shuffleArray(KAOMOJI[currentEmotion]);
-    let currentKaomojiIndex = 0;
+    // Track kaomoji index per emotion (so we can resume where we left off when switching back)
+    const kaomojiIndices = {};
+    for (const emotion of EMOTIONS) {
+      kaomojiIndices[emotion] = 0;
+    }
     let lastBeatTime = 0;
 
     // Audio state
@@ -233,12 +243,19 @@
     // RENDERING
     // ==========================================================================
     function getCurrentKaomoji() {
-      return KAOMOJI[currentEmotion][currentKaomojiIndex];
+      return KAOMOJI[currentEmotion][kaomojiIndices[currentEmotion]];
     }
 
     function nextKaomoji() {
       const list = KAOMOJI[currentEmotion];
-      currentKaomojiIndex = (currentKaomojiIndex + 1) % list.length;
+      kaomojiIndices[currentEmotion] = (kaomojiIndices[currentEmotion] + 1) % list.length;
+    }
+
+    function setMood(newEmotion) {
+      if (newEmotion && EMOTIONS.includes(newEmotion) && newEmotion !== currentEmotion) {
+        currentEmotion = newEmotion;
+        renderKaomoji();
+      }
     }
 
     function renderKaomoji() {
@@ -363,7 +380,12 @@
           localUpdateInterval = null;
         }
 
-        // Use orchestrator's beat detection directly
+        // Update mood from orchestrator (at 30fps rate, no need for instant changes)
+        if (e.data.mood) {
+          setMood(e.data.mood);
+        }
+
+        // Use orchestrator's beat detection to advance kaomoji
         if (e.data.beat) {
           onBeat();
         }

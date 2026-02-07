@@ -18,24 +18,11 @@ let modalOverlay,
   modalClose;
 export let modalVisible = false;
 
-// Projects with gallery assets
+// Projects with gallery assets (moody_parkour excluded - mood is broadcast dynamically)
 const PROJECTS_WITH_ASSETS = {
   draw_m3_like_one_of_your_ZnJlbmNoIGdpcmxz: "gallery.json",
   circling_cycle: "shapes.json",
-  moody_parkour: "emotions", // Special: hardcoded emotions, no JSON file
 };
-
-// Hardcoded emotions for moody_parkour
-const MOODY_PARKOUR_EMOTIONS = [
-  "happy",
-  "sad",
-  "angry",
-  "love",
-  "surprised",
-  "confused",
-  "sleepy",
-  "excited",
-];
 
 // Loaded asset data (cached)
 const assetCache = {};
@@ -131,18 +118,6 @@ async function updateAssetDropdown() {
 
   // Clear existing options except "random"
   assetSelect.innerHTML = '<option value="random">random</option>';
-
-  // Handle moody_parkour specially (hardcoded emotions, no JSON file)
-  if (project === "moody_parkour") {
-    MOODY_PARKOUR_EMOTIONS.forEach((emotion) => {
-      const option = document.createElement("option");
-      option.value = emotion;
-      option.textContent = emotion;
-      assetSelect.appendChild(option);
-    });
-    assetSelectContainer.classList.remove("hidden");
-    return;
-  }
 
   // Load assets from JSON file
   const assets = await loadProjectAssets(project);

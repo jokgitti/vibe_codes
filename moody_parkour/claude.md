@@ -98,18 +98,21 @@ The project receives audio data via `postMessage`:
 ```javascript
 {
   type: 'audio',
-  beat: true,        // Used to trigger kaomoji change
+  beat: true,        // Used to advance to next kaomoji in current mood
+  mood: 'happy',     // Current detected mood (updates every 1 second)
   timestamp: number
 }
 ```
 
-### URL Parameters
+### Audio-Reactive Behavior
 
-| Parameter | Effect |
-|-----------|--------|
-| `emotion` | Sets the emotion category (e.g., `?emotion=happy`) |
+When running in the orchestrator:
 
-When opened via the orchestrator's manual project modal (Cmd+O), users can select a specific emotion. Auto-opened windows use **music-based emotion detection** - the orchestrator analyzes energy trends to pick an appropriate emotion.
+1. **Beat detected** → Advance to next kaomoji in current mood's set
+2. **Mood changes** → Switch to the new mood's kaomoji set (continuing from where that mood left off)
+3. **Initialization** → All kaomoji sets are shuffled so each window displays different sequences
+
+Each emotion maintains its own index, so switching between moods resumes where you left off rather than restarting from the beginning.
 
 ### Music-Based Emotion Detection
 
@@ -117,7 +120,7 @@ The orchestrator tracks energy over time and maps trends to emotions:
 
 | Trend | Energy | Emotion |
 |-------|--------|---------|
-| Erratic | high | angry |
+| Erratic | high | excited |
 | Erratic | med+ | confused |
 | Erratic | med/low | surprised |
 | Rising | high | excited |
@@ -132,6 +135,6 @@ The orchestrator tracks energy over time and maps trends to emotions:
 | Stable | med | love |
 | Stable | low | sleepy |
 
-Rare emotions (angry, confused, surprised) only trigger on truly erratic/chaotic audio patterns.
+Rare emotions (confused, surprised) only trigger on sustained erratic patterns (50%+ of samples in a 1-second window must have high variance).
 
 No special init handling is required. The canvas auto-sizes based on kaomoji content.

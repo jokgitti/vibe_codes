@@ -2,13 +2,16 @@
 // AUDIO CAPTURE & ANALYSIS
 // =============================================================================
 
-import { CONFIG } from './config.js';
-import { state } from './state.js';
-import { setStatus } from './ui.js';
+import { CONFIG } from "./config.js";
+import { state } from "./state.js";
+import { setStatus } from "./ui.js";
+import { getCurrentEmotion } from "./mood.js";
 
 export async function initAudio() {
   try {
-    state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    state.audioContext = new (
+      window.AudioContext || window.webkitAudioContext
+    )();
     state.analyser = state.audioContext.createAnalyser();
     state.analyser.fftSize = CONFIG.FFT_SIZE;
     state.analyser.smoothingTimeConstant = 0.3;
@@ -22,10 +25,10 @@ export async function initAudio() {
     state.timeDomainData = new Uint8Array(state.analyser.fftSize);
     state.audioEnabled = true;
 
-    setStatus('mic ready (cmd+s to start)');
+    setStatus("mic ready (cmd+s to start)");
   } catch (err) {
-    console.error('Audio init failed:', err);
-    setStatus('audio init failed: ' + err.message);
+    console.error("Audio init failed:", err);
+    setStatus("audio init failed: " + err.message);
   }
 }
 
@@ -43,7 +46,9 @@ export function getVolume() {
 
 export function getAverageVolume() {
   if (state.volumeHistory.length === 0) return 0;
-  return state.volumeHistory.reduce((a, b) => a + b, 0) / state.volumeHistory.length;
+  return (
+    state.volumeHistory.reduce((a, b) => a + b, 0) / state.volumeHistory.length
+  );
 }
 
 export function getOnsetThreshold() {
@@ -60,14 +65,15 @@ let frequencyDataBuffer = null;
 
 // Reusable data object for postMessage
 const broadcastData = {
-  type: 'audio',
+  type: "audio",
   volume: 0,
   normalizedVolume: 0,
   avgVolume: 0,
   beat: false,
+  mood: null,
   timeDomainData: null,
   frequencyData: null,
-  timestamp: 0
+  timestamp: 0,
 };
 
 export function broadcastAudioData(volume, beat) {
@@ -83,7 +89,10 @@ export function broadcastAudioData(volume, beat) {
   // Compress loud signals to prevent clipping, but keep quiet signals quiet
   if (state.timeDomainData) {
     // Initialize buffer once
-    if (!normalizedTimeDomainBuffer || normalizedTimeDomainBuffer.length !== state.timeDomainData.length) {
+    if (
+      !normalizedTimeDomainBuffer ||
+      normalizedTimeDomainBuffer.length !== state.timeDomainData.length
+    ) {
       normalizedTimeDomainBuffer = new Array(state.timeDomainData.length);
     }
 
@@ -110,7 +119,10 @@ export function broadcastAudioData(volume, beat) {
   if (state.analyser && state.frequencyData) {
     state.analyser.getByteFrequencyData(state.frequencyData);
     // Initialize buffer once
-    if (!frequencyDataBuffer || frequencyDataBuffer.length !== state.frequencyData.length) {
+    if (
+      !frequencyDataBuffer ||
+      frequencyDataBuffer.length !== state.frequencyData.length
+    ) {
       frequencyDataBuffer = new Array(state.frequencyData.length);
     }
     // Copy without creating new array
@@ -124,6 +136,7 @@ export function broadcastAudioData(volume, beat) {
   broadcastData.normalizedVolume = normalizedVolume;
   broadcastData.avgVolume = avgVolume;
   broadcastData.beat = beat;
+  broadcastData.mood = getCurrentEmotion();
   broadcastData.timeDomainData = normalizedTimeDomainBuffer;
   broadcastData.frequencyData = frequencyDataBuffer;
   broadcastData.timestamp = performance.now();
@@ -132,7 +145,7 @@ export function broadcastAudioData(volume, beat) {
   const windows = state.virtualWindows;
   for (let i = 0; i < windows.length; i++) {
     try {
-      windows[i].iframe.contentWindow.postMessage(broadcastData, '*');
+      windows[i].iframe.contentWindow.postMessage(broadcastData, "*");
     } catch (_e) {
       // Iframe might not be ready
     }

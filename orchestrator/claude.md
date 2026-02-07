@@ -63,6 +63,7 @@ The orchestrator captures audio once and broadcasts to all iframes via `postMess
   type: 'audio',
   volume: 12.5,              // Calculated volume (0-128)
   beat: true,                // Beat detected this frame
+  mood: 'happy',             // Current detected emotion (for moody_parkour)
   frequencyData: [...],      // For projects that need frequency data
   timeDomainData: [...],     // For waveform visualizers
   timestamp: performance.now()
@@ -215,20 +216,22 @@ Some projects support selecting specific assets instead of random selection:
 - Assets: circle, s-shape, figure8, heart, star
 - URL parameter: `?shape=<id>` (e.g., `?shape=heart`)
 
-**moody_parkour** (hardcoded emotions):
+**moody_parkour**:
 
-- Pixel art kaomoji display that changes on beats
+- Pixel art kaomoji display that reacts to beats and mood changes
 - Emotions: happy, sad, angry, love, surprised, confused, sleepy, excited
-- URL parameter: `?emotion=<id>` (e.g., `?emotion=happy`)
-- Auto-opened windows use **music-based emotion detection** (see below)
+- **Dynamic mood**: All windows receive mood updates via broadcast and switch kaomoji sets accordingly
+- **Beat-driven**: Kaomoji advances to next in current mood's set on each beat
+- **Shuffled sets**: Each window shuffles all kaomoji sets at init, creating unique sequences
+- No asset selection - mood is determined entirely by music analysis
 
 ### Music-Based Emotion Detection (moody_parkour)
 
-When moody_parkour windows are auto-opened (via beat detection), the orchestrator analyzes the music's energy trend to select an appropriate emotion:
+The orchestrator continuously analyzes the music's energy trends and broadcasts the detected mood to all moody_parkour windows at 30fps. Windows dynamically switch kaomoji sets as the mood changes:
 
 | Trend   | Energy   | Emotion   |
 | ------- | -------- | --------- |
-| Erratic | high     | angry     |
+| Erratic | high     | excited   |
 | Erratic | med+     | confused  |
 | Erratic | med/low  | surprised |
 | Rising  | high     | excited   |
@@ -243,7 +246,7 @@ When moody_parkour windows are auto-opened (via beat detection), the orchestrato
 | Stable  | med      | love      |
 | Stable  | low      | sleepy    |
 
-Rare emotions (angry, confused, surprised) only trigger on truly erratic patterns.
+Rare emotions (confused, surprised) only trigger on sustained erratic patterns (50%+ of samples in a 1-second window must have high variance).
 
 The system tracks:
 

@@ -19,6 +19,12 @@ const MOOD_CONFIG = {
 
   // Variance threshold for "erratic" detection (higher = harder to trigger)
   ERRATIC_VARIANCE: 100,
+
+  // Percentage of samples that must exceed ERRATIC_VARIANCE to trigger erratic mood
+  ERRATIC_SUSTAINED_RATIO: 0.5, // 50% of samples must be high variance
+
+  // Minimum time between mood changes (prevents rapid oscillation)
+  MOOD_CHANGE_COOLDOWN_MS: 1000,
 };
 
 // Calculate samples needed for each window
@@ -32,6 +38,13 @@ const LONG_WINDOW_SAMPLES = Math.ceil(
 // Energy history buffer (stores recent volume samples)
 const energyHistory = [];
 
+// Buffer for mood window averaging (stores trend and energy samples during cooldown)
+const moodWindowBuffer = {
+  trends: [], // Raw trend percentages
+  energies: [], // Raw shortAvg values
+  variances: [], // Raw variance values
+};
+
 // Track the current mood state
 let currentMood = {
   emotion: "happy",
@@ -39,6 +52,9 @@ let currentMood = {
   energyLevel: "medium",
   confidence: 0,
 };
+
+// Track when emotion last changed (for throttling)
+let lastEmotionChangeTime = 0;
 
 /**
  * Record a new volume sample for mood tracking
@@ -100,56 +116,119 @@ function updateMood() {
   // Calculate trend as percentage change from baseline
   const trend = longAvg > 0 ? (shortAvg - longAvg) / longAvg : 0;
 
-  // Determine trend category
-  let trendCategory;
-  if (shortVariance > MOOD_CONFIG.ERRATIC_VARIANCE) {
-    trendCategory = "erratic";
-  } else if (trend > MOOD_CONFIG.RISING_THRESHOLD) {
-    trendCategory = "rising";
-  } else if (trend < MOOD_CONFIG.FALLING_THRESHOLD) {
-    trendCategory = "falling";
-  } else {
-    trendCategory = "stable";
-  }
+  // Buffer samples for averaging over the mood window
+  moodWindowBuffer.trends.push(trend);
+  moodWindowBuffer.energies.push(shortAvg);
+  moodWindowBuffer.variances.push(shortVariance);
 
-  // Determine energy level (4 bands: low, medium, medium-high, high)
-  let energyLevel;
-  if (shortAvg < MOOD_CONFIG.LOW_ENERGY) {
-    energyLevel = "low";
-  } else if (shortAvg > MOOD_CONFIG.HIGH_ENERGY) {
-    energyLevel = "high";
-  } else if (shortAvg > MOOD_CONFIG.MEDIUM_HIGH_ENERGY) {
-    energyLevel = "medium-high";
-  } else {
-    energyLevel = "medium";
-  }
+  // Check if cooldown has passed
+  const now = performance.now();
+  const timeSinceLastChange = now - lastEmotionChangeTime;
+  const canChangeEmotion =
+    timeSinceLastChange >= MOOD_CONFIG.MOOD_CHANGE_COOLDOWN_MS;
 
-  // Map trend + energy to emotion
-  const emotion = mapToEmotion(trendCategory, energyLevel);
+  let emotion = currentMood.emotion;
+  let trendCategory = currentMood.trend;
+  let energyLevel = currentMood.energyLevel;
+
+  if (canChangeEmotion && moodWindowBuffer.trends.length > 0) {
+    // Average the buffered values over the mood window
+    const avgTrend = simpleAverage(moodWindowBuffer.trends);
+    const avgEnergy = simpleAverage(moodWindowBuffer.energies);
+
+    // Count how many samples had high variance (sustained erratic detection)
+    const highVarianceCount = countAboveThreshold(
+      moodWindowBuffer.variances,
+      MOOD_CONFIG.ERRATIC_VARIANCE,
+    );
+    const highVarianceRatio =
+      highVarianceCount / moodWindowBuffer.variances.length;
+
+    // Determine trend category from averaged values
+    if (highVarianceRatio >= MOOD_CONFIG.ERRATIC_SUSTAINED_RATIO) {
+      trendCategory = "erratic";
+    } else if (avgTrend > MOOD_CONFIG.RISING_THRESHOLD) {
+      trendCategory = "rising";
+    } else if (avgTrend < MOOD_CONFIG.FALLING_THRESHOLD) {
+      trendCategory = "falling";
+    } else {
+      trendCategory = "stable";
+    }
+
+    // Determine energy level from averaged values
+    if (avgEnergy < MOOD_CONFIG.LOW_ENERGY) {
+      energyLevel = "low";
+    } else if (avgEnergy > MOOD_CONFIG.HIGH_ENERGY) {
+      energyLevel = "high";
+    } else if (avgEnergy > MOOD_CONFIG.MEDIUM_HIGH_ENERGY) {
+      energyLevel = "medium-high";
+    } else {
+      energyLevel = "medium";
+    }
+
+    // Map averaged trend + energy to emotion
+    const newEmotion = mapToEmotion(trendCategory, energyLevel);
+
+    // Update emotion if different
+    if (newEmotion !== currentMood.emotion) {
+      emotion = newEmotion;
+      lastEmotionChangeTime = now;
+      console.log(
+        `[mood] ${emotion} (trend: ${trendCategory}, energy: ${energyLevel}, erratic: ${(highVarianceRatio * 100).toFixed(0)}%)`,
+      );
+    }
+
+    // Clear buffer for next window
+    moodWindowBuffer.trends.length = 0;
+    moodWindowBuffer.energies.length = 0;
+    moodWindowBuffer.variances.length = 0;
+  }
 
   // Update current mood
   currentMood = {
     emotion,
     trend: trendCategory,
     energyLevel,
-    confidence: Math.min(len / LONG_WINDOW_SAMPLES, 1), // Confidence grows as we collect more data
+    confidence: Math.min(len / LONG_WINDOW_SAMPLES, 1),
   };
+}
+
+/**
+ * Simple average of an array
+ */
+function simpleAverage(arr) {
+  if (arr.length === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < arr.length; i++) {
+    sum += arr[i];
+  }
+  return sum / arr.length;
+}
+
+/**
+ * Count how many values in array exceed threshold
+ */
+function countAboveThreshold(arr, threshold) {
+  let count = 0;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] > threshold) count++;
+  }
+  return count;
 }
 
 /**
  * Map trend and energy level to an emotion
  * Energy levels: low, medium, medium-high, high
  *
- * Rare emotions (reserved for specific conditions):
- * - angry: only erratic + high
- * - confused: only erratic + medium-high
- * - surprised: only erratic + medium or low
+ * Rare emotions (reserved for erratic conditions):
+ * - confused: erratic + medium-high
+ * - surprised: erratic + medium or low
  */
 function mapToEmotion(trend, energy) {
-  // Erratic = rare emotions (angry, confused, surprised)
+  // Erratic = rare emotions (confused, surprised) or excited for high energy
   if (trend === "erratic") {
-    if (energy === "high") return "angry"; // Chaotic high energy
-    if (energy === "medium-high") return "confused"; // Chaotic medium-high
+    if (energy === "high") return "excited"; // Chaotic high energy (e.g. heavy drops)
+    if (energy === "medium-high") return "confused";
     return "surprised"; // Chaotic lower energy
   }
 
@@ -200,10 +279,14 @@ export function getMoodState() {
  */
 export function resetMood() {
   energyHistory.length = 0;
+  moodWindowBuffer.trends.length = 0;
+  moodWindowBuffer.energies.length = 0;
+  moodWindowBuffer.variances.length = 0;
   currentMood = {
     emotion: "happy",
     trend: "stable",
     energyLevel: "medium",
     confidence: 0,
   };
+  lastEmotionChangeTime = 0;
 }

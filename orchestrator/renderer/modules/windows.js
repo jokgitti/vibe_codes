@@ -7,7 +7,6 @@ import { state } from "./state.js";
 import { updateUI, setStatus } from "./ui.js";
 import { makeDraggable, bringToFront } from "./drag.js";
 import { calculateDrawMeDimensions } from "./gallery.js";
-import { getMoodState } from "./mood.js";
 
 let windowContainer;
 
@@ -336,17 +335,8 @@ export function createVirtualWindow() {
   // Skip per-project limit check when a single project filter is active
   const skipProjectLimit = state.projectFilter !== "all";
 
-  // For moody_parkour, use detected emotion from music analysis
-  let asset = "random";
-  if (project === "moody_parkour") {
-    const mood = getMoodState();
-    asset = mood.emotion;
-    console.log(
-      `[moody_parkour] ${mood.emotion} (${mood.trend} ${mood.energyLevel})`,
-    );
-  }
-
-  return createVirtualWindowWithProject(project, asset, skipProjectLimit);
+  // moody_parkour receives mood updates via broadcast, no need to set initial emotion
+  return createVirtualWindowWithProject(project, "random", skipProjectLimit);
 }
 
 export function createVirtualWindowWithProject(
